@@ -89,6 +89,7 @@
   let settings = {};
   let selectedGroup = '';
   let editingLinkId = null;
+  let editingGroupName = null; // group name being renamed
   let contextLinkId = null; // link right-clicked on (null if clicked on empty area)
   let contextGroup = null;  // which group area was right-clicked
   let modalMode = null; // 'add-link', 'edit-link', 'add-group'
@@ -553,9 +554,14 @@
       modalBodyGroup.classList.remove('hidden');
       inputGroupName.value = '';
       inputGroupName.focus();
+    } else if (mode === 'edit-group') {
+      modalTitle.textContent = 'Đổi tên nhóm';
+      modalBodyLink.classList.add('hidden');
+      modalBodyGroup.classList.remove('hidden');
+      inputGroupName.value = link; // reusing link param for group name
+      editingGroupName = link;
+      inputGroupName.focus();
     } else {
-      modalBodyLink.classList.remove('hidden');
-      modalBodyGroup.classList.add('hidden');
 
       // Populate group selector
       inputGroup.innerHTML = '';
@@ -595,13 +601,29 @@
   });
 
   modalSave.addEventListener('click', () => {
-    if (modalMode === 'add-group') {
+    if (modalMode === 'add-group' || modalMode === 'edit-group') {
       const name = inputGroupName.value.trim();
       if (!name) return;
-      if (groups.list.includes(name)) return; // duplicate
-      groups.list.push(name);
-      selectedGroup = name;
-      groups.selected = name;
+      if (groups.list.includes(name) && name !== editingGroupName) return; // duplicate
+
+      if (modalMode === 'edit-group' && editingGroupName) {
+        // Update list
+        groups.list = groups.list.map(g => g === editingGroupName ? name : g);
+        // Update pinned
+        groups.pinned = groups.pinned.map(p => p === editingGroupName ? name : p);
+        // Update links
+        links.forEach(l => {
+          if (l.parent === editingGroupName) l.parent = name;
+        });
+        if (selectedGroup === editingGroupName) selectedGroup = name;
+        groups.selected = selectedGroup;
+      } else {
+        // Add new
+        groups.list.push(name);
+        selectedGroup = name;
+        groups.selected = name;
+      }
+      
       saveData();
       closeModal();
       render();
@@ -729,6 +751,17 @@
         renderGroupList();
       });
       item.appendChild(pinBtn);
+
+      // Rename button
+      const renBtn = document.createElement('button');
+      renBtn.className = 'btn-ren-group';
+      renBtn.innerHTML = '✏️';
+      renBtn.title = 'Đổi tên nhóm';
+      renBtn.addEventListener('click', () => {
+        closeSettings();
+        openModal('edit-group', g);
+      });
+      item.appendChild(renBtn);
 
       // Delete button (can't delete pinned or if only 2 groups left)
       if (g !== groups.pinned && groups.list.length > 2) {

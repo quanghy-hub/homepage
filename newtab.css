@@ -404,6 +404,21 @@ body {
   color: #388bfd;
 }
 
+.btn-ren-group {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.btn-ren-group:hover {
+  opacity: 1;
+}
+
 .btn-flat {
   background: none;
   border: none;
