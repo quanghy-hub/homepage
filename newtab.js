@@ -449,22 +449,6 @@
     selectedGroupLinks.forEach(l => {
       selectedGrid.appendChild(createLinkEl(l));
     });
-
-    // Drop zone for selected grid
-    selectedGrid.addEventListener('dragover', e => { e.preventDefault(); });
-    selectedGrid.addEventListener('drop', e => {
-      if (e.target !== selectedGrid) return;
-      const draggedId = e.dataTransfer.getData('text/plain');
-      if (draggedId) {
-        const dragged = links.find(l => l._id === draggedId);
-        if (dragged) {
-          dragged.parent = selectedGroup;
-          dragged.order = getLinksForGroup(selectedGroup).length;
-          saveData();
-          render();
-        }
-      }
-    });
   }
 
   /* ========== CONTEXT MENU ========== */
@@ -501,8 +485,9 @@
       e.preventDefault();
       // Determine which group area we're in
       let group = selectedGroup;
-      if (e.target.closest('#pinned-grid') || e.target.closest('#pinned-section')) {
-        group = groups.pinned;
+      const pinnedEl = e.target.closest('.links-grid[data-group]');
+      if (pinnedEl && groups.pinned.includes(pinnedEl.dataset.group)) {
+        group = pinnedEl.dataset.group;
       }
       showContextMenu(e.pageX, e.pageY, null, group);
     }
@@ -556,6 +541,8 @@
       editingGroupName = link;
       inputGroupName.focus();
     } else {
+      modalBodyLink.classList.remove('hidden');
+      modalBodyGroup.classList.add('hidden');
 
       // Populate group selector
       inputGroup.innerHTML = '';
@@ -586,6 +573,7 @@
   function closeModal() {
     modalOverlay.classList.add('hidden');
     editingLinkId = null;
+    editingGroupName = null;
     modalMode = null;
   }
 
@@ -758,7 +746,7 @@
       item.appendChild(renBtn);
 
       // Delete button (can't delete pinned or if only 2 groups left)
-      if (g !== groups.pinned && groups.list.length > 2) {
+      if (!groups.pinned.includes(g) && groups.list.length > 2) {
         const delBtn = document.createElement('button');
         delBtn.className = 'btn-del-group';
         delBtn.textContent = '✕';
@@ -768,7 +756,7 @@
           groups.list = groups.list.filter(x => x !== g);
           links = links.filter(l => l.parent !== g);
           if (selectedGroup === g) {
-            selectedGroup = groups.list.find(x => x !== groups.pinned) || groups.list[0];
+            selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
             groups.selected = selectedGroup;
           }
           saveData();
@@ -898,7 +886,7 @@
       if (imported.links) links = imported.links;
       if (imported.groups) {
         groups = imported.groups;
-        selectedGroup = groups.selected || groups.list.find(g => g !== groups.pinned) || groups.list[0];
+        selectedGroup = groups.selected || groups.list.find(g => !groups.pinned.includes(g)) || groups.list[0];
       }
       if (imported.settings) settings = Object.assign({}, DEFAULT_SETTINGS, imported.settings);
 
@@ -926,6 +914,22 @@
       closeModal();
       closeSettings();
       hideContextMenu();
+    }
+  });
+
+  /* ========== SELECTED GRID DROP ZONE (registered once) ========== */
+  selectedGrid.addEventListener('dragover', e => { e.preventDefault(); });
+  selectedGrid.addEventListener('drop', e => {
+    if (e.target !== selectedGrid) return;
+    const draggedId = e.dataTransfer.getData('text/plain');
+    if (draggedId) {
+      const dragged = links.find(l => l._id === draggedId);
+      if (dragged) {
+        dragged.parent = selectedGroup;
+        dragged.order = getLinksForGroup(selectedGroup).length;
+        saveData();
+        render();
+      }
     }
   });
 

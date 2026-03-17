@@ -331,6 +331,8 @@ body {
 /* ===== Settings Panel ===== */
 .settings-modal {
   width: 380px;
+  max-height: 85vh;
+  overflow-y: auto;
 }
 
 .settings-section {
@@ -440,7 +442,6 @@ body {
   font-weight: 600;
 }
 
-/* ===== Utilities ===== */
 /* ===== Sync ===== */
 .sync-actions {
   display: flex;
@@ -474,11 +475,7 @@ body {
 .sync-status.ok { color: #3fb950; }
 .sync-status.err { color: #f85149; }
 
-.settings-modal {
-  width: 380px;
-  max-height: 85vh;
-  overflow-y: auto;
-}
+
 
 /* ===== Utilities ===== */
 .hidden { display: none !important; }
