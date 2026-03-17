@@ -365,6 +365,28 @@ body {
   color: #f85149;
 }
 
+.btn-pin-group {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-left: auto;
+  margin-right: 4px;
+  opacity: 0.5;
+  transition: all 0.2s;
+}
+
+.btn-pin-group:hover, .btn-pin-group.active {
+  opacity: 1;
+  background: rgba(255,255,255,0.05);
+}
+
+.btn-pin-group.active {
+  color: #388bfd;
+}
+
 .btn-flat {
   background: none;
   border: none;

@@ -643,12 +643,19 @@
       nameSpan.textContent = g;
       item.appendChild(nameSpan);
 
-      if (g === groups.pinned) {
-        const pinLabel = document.createElement('span');
-        pinLabel.className = 'group-pinned';
-        pinLabel.textContent = '📌 ghim';
-        item.appendChild(pinLabel);
-      }
+      // Pin toggle button
+      const pinBtn = document.createElement('button');
+      pinBtn.className = 'btn-pin-group' + (g === groups.pinned ? ' active' : '');
+      pinBtn.innerHTML = g === groups.pinned ? '📌' : '📍';
+      pinBtn.title = g === groups.pinned ? 'Đang ghim' : 'Ghim nhóm này';
+      pinBtn.addEventListener('click', () => {
+        if (g === groups.pinned) return;
+        groups.pinned = g;
+        saveData();
+        render();
+        renderGroupList();
+      });
+      item.appendChild(pinBtn);
 
       // Delete button (can't delete pinned or if only 2 groups left)
       if (g !== groups.pinned && groups.list.length > 2) {
