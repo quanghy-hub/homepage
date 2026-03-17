@@ -933,6 +933,14 @@
     }
   });
 
+  /* ========== AUTO-REFRESH ON EXTERNAL CHANGES ========== */
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.links) {
+      links = changes.links.newValue || [];
+      render();
+    }
+  });
+
   /* ========== INIT ========== */
   loadData().then(() => render());
 

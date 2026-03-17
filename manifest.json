@@ -7,8 +7,12 @@
     "newtab": "index.html"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "contextMenus"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "icons": {
     "128": "icon128.png"
   }
