@@ -231,10 +231,9 @@
     });
 
     el.addEventListener('dragover', e => {
-      const srcGroup = e.dataTransfer.types.includes('application/group') ? null : null;
-      // We check group in drop; just allow dragover
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
+      const draggedParent = document.querySelector('.link-item.dragging');
       if (draggedParent && draggedParent.dataset.id !== link._id) {
         el.classList.add('drag-over');
       }
