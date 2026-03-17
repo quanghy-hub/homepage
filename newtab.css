@@ -221,6 +221,23 @@ body {
   color: #e6edf3;
 }
 
+.group-header, .pinned-group-header {
+  font-size: 10px;
+  font-weight: 600;
+  color: #444b54;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  margin-top: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 0 12px;
+}
+
+.links-grid.centered + .pinned-group-header {
+  text-align: center;
+}
+
 .modal h4 {
   font-size: 13px;
   font-weight: 600;

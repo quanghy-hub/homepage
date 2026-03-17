@@ -4,7 +4,7 @@
   /* ========== DEFAULT DATA ========== */
   const DEFAULT_GROUPS = {
     list: ['A', '☓ ', 'D', 'C', 'B', 'E'],
-    pinned: 'A',
+    pinned: ['A'], // Array of pinned group names
     selected: '☓ '
   };
 
@@ -124,12 +124,16 @@
         if (result.links && result.links.length > 0) {
           links = result.links;
           groups = result.groups || JSON.parse(JSON.stringify(DEFAULT_GROUPS));
+          // Migrate pinned from string to array if needed
+          if (typeof groups.pinned === 'string') {
+            groups.pinned = [groups.pinned];
+          }
         } else {
           links = JSON.parse(JSON.stringify(DEFAULT_LINKS));
           groups = JSON.parse(JSON.stringify(DEFAULT_GROUPS));
         }
         settings = Object.assign({}, DEFAULT_SETTINGS, result.settings || {});
-        selectedGroup = groups.selected || groups.list.find(g => g !== groups.pinned) || groups.list[0];
+        selectedGroup = groups.selected || groups.list.find(g => !groups.pinned.includes(g)) || groups.list[0];
         resolve();
       });
     });
@@ -248,8 +252,7 @@
       // We check group in drop; just allow dragover
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      const draggedParent = document.querySelector('.link-item.dragging');
-      if (draggedParent && draggedParent.dataset.parent === link.parent && draggedParent.dataset.id !== link._id) {
+      if (draggedParent && draggedParent.dataset.id !== link._id) {
         el.classList.add('drag-over');
       }
     });
@@ -263,11 +266,7 @@
       el.classList.remove('drag-over');
       const draggedId = e.dataTransfer.getData('text/plain');
       if (!draggedId || draggedId === link._id) return;
-      const dragged = links.find(l => l._id === draggedId);
-      if (!dragged) return;
-      // Only allow reorder within same group
-      if (dragged.parent !== link.parent) return;
-      reorderLink(draggedId, link._id);
+      reorderLink(draggedId, link._id, link.parent);
     });
 
     // Touch drag
@@ -366,16 +365,25 @@
     });
   }
 
-  /* ========== REORDER (same group only) ========== */
-  function reorderLink(draggedId, targetId) {
+  /* ========== REORDER (can change group) ========== */
+  function reorderLink(draggedId, targetId, targetGroup) {
     const dragged = links.find(l => l._id === draggedId);
     const target = links.find(l => l._id === targetId);
-    if (!dragged || !target || dragged.parent !== target.parent) return;
+    if (!dragged || !target) return;
+
+    // Move dragged to target group
+    dragged.parent = targetGroup || target.parent;
 
     const groupLinks = getLinksForGroup(dragged.parent);
     const filtered = groupLinks.filter(l => l._id !== draggedId);
     const targetIdx = filtered.findIndex(l => l._id === targetId);
-    filtered.splice(targetIdx, 0, dragged);
+    
+    if (targetIdx !== -1) {
+      filtered.splice(targetIdx, 0, dragged);
+    } else {
+      filtered.push(dragged);
+    }
+    
     filtered.forEach((l, i) => l.order = i);
 
     saveData();
@@ -386,15 +394,48 @@
   function render() {
     applySettings();
 
-    // Pinned group
+    // Pinned groups
     pinnedGrid.innerHTML = '';
-    getLinksForGroup(groups.pinned).forEach(l => {
-      pinnedGrid.appendChild(createLinkEl(l));
+    groups.pinned.forEach(groupName => {
+      const groupLinks = getLinksForGroup(groupName);
+      if (groupLinks.length === 0 && groupName !== groups.pinned[0]) return;
+
+      const grid = document.createElement('div');
+      grid.className = 'links-grid' + (settings.centered ? ' centered' : '');
+      grid.dataset.group = groupName;
+      groupLinks.forEach(l => {
+        grid.appendChild(createLinkEl(l));
+      });
+      
+      const header = document.createElement('div');
+      header.className = 'pinned-group-header';
+      header.textContent = groupName;
+
+      // Drop zone for empty grid or general grid area
+      grid.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      });
+      grid.addEventListener('drop', e => {
+        if (e.target !== grid) return; 
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (!draggedId) return;
+        const dragged = links.find(l => l._id === draggedId);
+        if (dragged) {
+          dragged.parent = groupName;
+          dragged.order = getLinksForGroup(groupName).length;
+          saveData();
+          render();
+        }
+      });
+
+      pinnedGrid.appendChild(grid);
+      pinnedGrid.appendChild(header);
     });
 
     // Group tabs (below icons)
     groupTabs.innerHTML = '';
-    groups.list.filter(g => g !== groups.pinned).forEach(g => {
+    groups.list.filter(g => !groups.pinned.includes(g)).forEach(g => {
       const tab = document.createElement('button');
       tab.className = 'tab' + (g === selectedGroup ? ' active' : '');
       tab.textContent = g;
@@ -409,8 +450,25 @@
 
     // Selected group
     selectedGrid.innerHTML = '';
-    getLinksForGroup(selectedGroup).forEach(l => {
+    const selectedGroupLinks = getLinksForGroup(selectedGroup);
+    selectedGroupLinks.forEach(l => {
       selectedGrid.appendChild(createLinkEl(l));
+    });
+
+    // Drop zone for selected grid
+    selectedGrid.addEventListener('dragover', e => { e.preventDefault(); });
+    selectedGrid.addEventListener('drop', e => {
+      if (e.target !== selectedGrid) return;
+      const draggedId = e.dataTransfer.getData('text/plain');
+      if (draggedId) {
+        const dragged = links.find(l => l._id === draggedId);
+        if (dragged) {
+          dragged.parent = selectedGroup;
+          dragged.order = getLinksForGroup(selectedGroup).length;
+          saveData();
+          render();
+        }
+      }
     });
   }
 
@@ -645,12 +703,27 @@
 
       // Pin toggle button
       const pinBtn = document.createElement('button');
-      pinBtn.className = 'btn-pin-group' + (g === groups.pinned ? ' active' : '');
-      pinBtn.innerHTML = g === groups.pinned ? '📌' : '📍';
-      pinBtn.title = g === groups.pinned ? 'Đang ghim' : 'Ghim nhóm này';
+      const isPinned = groups.pinned.includes(g);
+      pinBtn.className = 'btn-pin-group' + (isPinned ? ' active' : '');
+      pinBtn.innerHTML = isPinned ? '📌' : '📍';
+      pinBtn.title = isPinned ? 'Bỏ ghim' : 'Ghim nhóm này';
       pinBtn.addEventListener('click', () => {
-        if (g === groups.pinned) return;
-        groups.pinned = g;
+        if (isPinned) {
+          // Unpin (only if at least 1 pinned remaining or we allow 0)
+          groups.pinned = groups.pinned.filter(p => p !== g);
+          if (selectedGroup === g || !selectedGroup) {
+             selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
+          }
+        } else {
+          // Pin
+          if (!groups.pinned.includes(g)) {
+            groups.pinned.push(g);
+          }
+          if (selectedGroup === g) {
+            selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
+          }
+        }
+        groups.selected = selectedGroup;
         saveData();
         render();
         renderGroupList();
