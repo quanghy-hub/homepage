@@ -157,12 +157,9 @@
   function autoTitle(url) {
     try {
       const u = new URL(url);
-      let host = u.hostname.replace(/^(www\.|m\.)/, '');
-      const parts = host.split('.');
-      if (parts.length >= 2) {
-        host = parts[parts.length - 2];
-      }
-      return host.charAt(0).toUpperCase() + host.slice(1);
+      const parts = u.hostname.replace(/^(www\.|m\.)/, '').split('.');
+      const name = parts.length > 1 ? parts[parts.length - 2] : parts[0];
+      return name.charAt(0).toUpperCase() + name.slice(1);
     } catch {
       return 'Link';
     }
@@ -316,8 +313,9 @@
       e.preventDefault();
       const touch = e.touches[0];
       if (clone) {
-        clone.style.left = (touch.clientX - 38) + 'px';
-        clone.style.top = (touch.clientY - 38) + 'px';
+        const offset = (settings.iconSize || 56) / 2;
+        clone.style.left = (touch.clientX - offset) + 'px';
+        clone.style.top = (touch.clientY - offset) + 'px';
       }
 
       if (clone) clone.style.display = 'none';
@@ -326,7 +324,7 @@
       document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
       if (target) {
         const targetItem = target.closest('.link-item');
-        if (targetItem && targetItem.dataset.id !== link._id && targetItem.dataset.parent === link.parent) {
+        if (targetItem && targetItem.dataset.id !== link._id) {
           targetItem.classList.add('drag-over');
         }
       }
@@ -346,8 +344,20 @@
 
         if (target) {
           const targetItem = target.closest('.link-item');
-          if (targetItem && targetItem.dataset.id !== link._id && targetItem.dataset.parent === link.parent) {
-            reorderLink(link._id, targetItem.dataset.id);
+          if (targetItem && targetItem.dataset.id !== link._id) {
+            reorderLink(link._id, targetItem.dataset.id, targetItem.dataset.parent);
+          } else {
+            // Check if dropped directly on a grid
+            const grid = target.closest('.links-grid');
+            if (grid && grid.dataset.group) {
+               const dragged = links.find(l => l._id === link._id);
+               if (dragged) {
+                 dragged.parent = grid.dataset.group;
+                 dragged.order = getLinksForGroup(grid.dataset.group).length;
+                 saveData();
+                 render();
+               }
+            }
           }
         }
       }
