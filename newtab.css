@@ -1,0 +1,440 @@
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  overflow-x: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px 0 0;
+}
+
+/* ===== Main Container ===== */
+#main-container {
+  width: 100%;
+  max-width: var(--page-width, 1400px);
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px;
+}
+
+/* ===== Links Grid ===== */
+.links-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  width: 100%;
+  min-height: 40px;
+}
+
+.links-grid.centered {
+  justify-content: center;
+}
+
+/* ===== Flat Link Icon ===== */
+.link-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: var(--icon-cell, 76px);
+  padding: 6px 0;
+  cursor: grab;
+  text-decoration: none;
+  position: relative;
+  transition: opacity 0.15s ease;
+}
+
+.link-item:active { cursor: grabbing; }
+
+.link-item .icon-wrap {
+  width: var(--icon-size, 56px);
+  height: var(--icon-size, 56px);
+  border-radius: 25%;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+  overflow: hidden;
+}
+
+.link-item:hover .icon-wrap {
+  transform: scale(1.06);
+}
+
+.link-item .icon-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.link-item .icon-label {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #8b949e;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+/* Drag states */
+.link-item.dragging {
+  opacity: 0.3;
+}
+
+.link-item.drag-over .icon-wrap {
+  background: #263545;
+  transform: scale(1.1);
+}
+
+/* ===== Group Tabs ===== */
+#group-tabs {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 0 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+#group-tabs .tab {
+  padding: 5px 16px;
+  border-radius: 16px;
+  border: none;
+  background: transparent;
+  color: #555d68;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+#group-tabs .tab:hover {
+  color: #9aa3ae;
+}
+
+#group-tabs .tab.active {
+  background: #1c2333;
+  color: #e6edf3;
+}
+
+/* ===== Settings Button ===== */
+#settings-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  color: #555d68;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+  z-index: 100;
+}
+
+#settings-btn:hover {
+  color: #e6edf3;
+  background: rgba(255,255,255,0.1);
+}
+
+/* ===== Context Menu ===== */
+.context-menu {
+  position: fixed;
+  background: #161b22;
+  border-radius: 10px;
+  padding: 4px 0;
+  min-width: 150px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.context-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  color: #c9d1d9;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.context-menu button:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.ctx-sep {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 4px 0;
+}
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal {
+  background: #161b22;
+  border-radius: 14px;
+  padding: 24px 28px;
+  width: 360px;
+  max-width: 90vw;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+
+.modal h3 {
+  margin-bottom: 18px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.modal h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b949e;
+  margin-bottom: 10px;
+}
+
+.modal label {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #8b949e;
+  font-weight: 500;
+}
+
+.modal input[type="url"],
+.modal input[type="text"],
+.modal input[type="password"],
+.modal select {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #0d1117;
+  color: #e6edf3;
+  font-size: 14px;
+  outline: none;
+}
+
+.modal input[type="url"]:focus,
+.modal input[type="text"]:focus,
+.modal input[type="password"]:focus,
+.modal select:focus {
+  box-shadow: 0 0 0 1px #388bfd;
+}
+
+.modal input[type="range"] {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  accent-color: #388bfd;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #388bfd;
+  cursor: pointer;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.modal-actions button {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#modal-cancel, #settings-close {
+  background: rgba(255,255,255,0.06);
+  color: #8b949e;
+}
+
+#modal-cancel:hover, #settings-close:hover { background: rgba(255,255,255,0.1); }
+
+#modal-save {
+  background: #1f6feb;
+  color: #fff;
+}
+
+#modal-save:hover { background: #388bfd; }
+
+/* ===== Settings Panel ===== */
+.settings-modal {
+  width: 380px;
+}
+
+.settings-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+#settings-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.settings-group-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.03);
+  font-size: 13px;
+  color: #c9d1d9;
+}
+
+.settings-group-item .group-name {
+  flex: 1;
+}
+
+.settings-group-item .group-pinned {
+  font-size: 10px;
+  color: #388bfd;
+  margin-left: 8px;
+}
+
+.settings-group-item .btn-del-group {
+  background: none;
+  border: none;
+  color: #555d68;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.settings-group-item .btn-del-group:hover {
+  color: #f85149;
+}
+
+.btn-flat {
+  background: none;
+  border: none;
+  color: #388bfd;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: color 0.15s;
+}
+
+.btn-flat:hover { color: #58a6ff; }
+
+#setting-icon-size-val {
+  display: inline-block;
+  margin-left: 8px;
+  color: #58a6ff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ===== Utilities ===== */
+/* ===== Sync ===== */
+.sync-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-sync {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255,255,255,0.06);
+  color: #c9d1d9;
+  transition: background 0.15s;
+}
+
+.btn-sync:hover { background: rgba(255,255,255,0.1); }
+.btn-sync:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.sync-status {
+  margin-top: 8px;
+  font-size: 11px;
+  min-height: 16px;
+  color: #8b949e;
+}
+
+.sync-status.ok { color: #3fb950; }
+.sync-status.err { color: #f85149; }
+
+.settings-modal {
+  width: 380px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* ===== Utilities ===== */
+.hidden { display: none !important; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
