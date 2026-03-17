@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "QuickLinks Homepage",
+  "name": "Homepage",
   "version": "1.0.0",
   "description": "Custom new tab page with grouped quicklinks",
   "chrome_url_overrides": {
