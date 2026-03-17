@@ -3,8 +3,9 @@
   "name": "Homepage",
   "version": "1.0.0",
   "description": "Custom new tab page with grouped quicklinks",
+  "incognito": "split",
   "chrome_url_overrides": {
-    "newtab": "index.html"
+    "newtab": "newtab.html"
   },
   "permissions": [
     "storage",
@@ -14,6 +15,15 @@
     "service_worker": "background.js"
   },
   "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
     "128": "icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   }
 }
