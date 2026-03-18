@@ -797,6 +797,14 @@
     };
   }
 
+  // Save token & gist ID immediately when user types
+  gistTokenInput.addEventListener('input', () => {
+    chrome.storage.local.set({ gistToken: gistTokenInput.value.trim() });
+  });
+  gistIdInput.addEventListener('input', () => {
+    chrome.storage.local.set({ gistId: gistIdInput.value.trim() });
+  });
+
   function buildExportData() {
     return { links, groups, settings };
   }
