@@ -64,8 +64,7 @@
   ];
 
   const DEFAULT_SETTINGS = {
-    iconSize: 56,
-    centered: false
+    iconSize: 56
   };
 
   /* ========== STATE ========== */
@@ -98,7 +97,6 @@
   const settingsOverlay = document.getElementById('settings-overlay');
   const settingIconSize = document.getElementById('setting-icon-size');
   const settingIconSizeVal = document.getElementById('setting-icon-size-val');
-  const settingCenter = document.getElementById('setting-center');
   const settingsGroupList = document.getElementById('settings-group-list');
   const settingsAddGroup = document.getElementById('settings-add-group');
   const settingsClose = document.getElementById('settings-close');
@@ -156,14 +154,6 @@
     const cell = sz + 20;
     document.documentElement.style.setProperty('--icon-size', sz + 'px');
     document.documentElement.style.setProperty('--icon-cell', cell + 'px');
-
-    if (settings.centered) {
-      pinnedGrid.classList.add('centered');
-      selectedGrid.classList.add('centered');
-    } else {
-      pinnedGrid.classList.remove('centered');
-      selectedGrid.classList.remove('centered');
-    }
   }
 
   /* ========== RENDERING ========== */
@@ -334,13 +324,13 @@
             // Check if dropped directly on a grid
             const grid = target.closest('.links-grid');
             if (grid && grid.dataset.group) {
-               const dragged = links.find(l => l._id === link._id);
-               if (dragged) {
-                 dragged.parent = grid.dataset.group;
-                 dragged.order = getLinksForGroup(grid.dataset.group).length;
-                 saveData();
-                 render();
-               }
+              const dragged = links.find(l => l._id === link._id);
+              if (dragged) {
+                dragged.parent = grid.dataset.group;
+                dragged.order = getLinksForGroup(grid.dataset.group).length;
+                saveData();
+                render();
+              }
             }
           }
         }
@@ -372,13 +362,13 @@
     const groupLinks = getLinksForGroup(dragged.parent);
     const filtered = groupLinks.filter(l => l._id !== draggedId);
     const targetIdx = filtered.findIndex(l => l._id === targetId);
-    
+
     if (targetIdx !== -1) {
       filtered.splice(targetIdx, 0, dragged);
     } else {
       filtered.push(dragged);
     }
-    
+
     filtered.forEach((l, i) => l.order = i);
 
     saveData();
@@ -396,12 +386,12 @@
       if (groupLinks.length === 0 && groupName !== groups.pinned[0]) return;
 
       const grid = document.createElement('div');
-      grid.className = 'links-grid' + (settings.centered ? ' centered' : '');
+      grid.className = 'links-grid';
       grid.dataset.group = groupName;
       groupLinks.forEach(l => {
         grid.appendChild(createLinkEl(l));
       });
-      
+
       const header = document.createElement('div');
       header.className = 'pinned-group-header';
       header.textContent = groupName;
@@ -412,7 +402,7 @@
         e.dataTransfer.dropEffect = 'move';
       });
       grid.addEventListener('drop', e => {
-        if (e.target !== grid) return; 
+        if (e.target !== grid) return;
         const draggedId = e.dataTransfer.getData('text/plain');
         if (!draggedId) return;
         const dragged = links.find(l => l._id === draggedId);
@@ -605,7 +595,7 @@
         selectedGroup = name;
         groups.selected = name;
       }
-      
+
       saveData();
       closeModal();
       render();
@@ -662,7 +652,6 @@
     settingsOverlay.classList.remove('hidden');
     settingIconSize.value = settings.iconSize;
     settingIconSizeVal.textContent = settings.iconSize + 'px';
-    settingCenter.checked = settings.centered;
     renderGroupList();
     // Load saved gist credentials
     chrome.storage.local.get(['gistToken', 'gistId'], result => {
@@ -684,12 +673,6 @@
     const val = parseInt(settingIconSize.value);
     settingIconSizeVal.textContent = val + 'px';
     settings.iconSize = val;
-    saveData();
-    applySettings();
-  });
-
-  settingCenter.addEventListener('change', () => {
-    settings.centered = settingCenter.checked;
     saveData();
     applySettings();
   });
@@ -716,7 +699,7 @@
           // Unpin (only if at least 1 pinned remaining or we allow 0)
           groups.pinned = groups.pinned.filter(p => p !== g);
           if (selectedGroup === g || !selectedGroup) {
-             selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
+            selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
           }
         } else {
           // Pin
@@ -904,7 +887,6 @@
       // Update settings UI
       settingIconSize.value = settings.iconSize;
       settingIconSizeVal.textContent = settings.iconSize + 'px';
-      settingCenter.checked = settings.centered;
       renderGroupList();
 
       setSyncStatus('✓ Kéo về thành công · ' + new Date().toLocaleTimeString(), 'ok');
