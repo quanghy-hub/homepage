@@ -1,0 +1,21 @@
+/* Ẩn các class và id phổ biến của cookie banner */
+#onetrust-consent-sdk,
+#usercentrics-root,
+.didomi-popup-container,
+.didomi-notice,
+.truste_overlay,
+.truste_box_overlay,
+.iubenda-cs-overlay,
+.iubenda-cs-container,
+.cookie-banner,
+.cc-window,
+.cookie-consent,
+.cookie-notice,
+#cookie-notice,
+.CybotCookiebotDialog,
+#CybotCookiebotDialog {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}

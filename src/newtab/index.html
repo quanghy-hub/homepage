@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Tab</title>
+  <link rel="icon" type="image/png" href="../../assets/icons/icon128.png">
+  <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+  <div id="main-container">
+    <!-- Pinned Group Icons -->
+    <div class="links-grid" id="pinned-grid"></div>
+
+    <!-- Selected Group Icons -->
+    <div class="links-grid" id="selected-grid"></div>
+
+    <!-- Group Tabs (below icons) -->
+    <nav id="group-tabs"></nav>
+  </div>
+
+  <!-- Settings Button -->
+  <button id="settings-btn" title="Cài đặt">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5" />
+      <path
+        d="M16.2 12.3a1.3 1.3 0 00.26 1.43l.05.05a1.58 1.58 0 11-2.23 2.23l-.05-.05a1.3 1.3 0 00-1.43-.26 1.3 1.3 0 00-.79 1.19v.14a1.58 1.58 0 01-3.16 0v-.07a1.3 1.3 0 00-.85-1.19 1.3 1.3 0 00-1.43.26l-.05.05a1.58 1.58 0 11-2.23-2.23l.05-.05a1.3 1.3 0 00.26-1.43 1.3 1.3 0 00-1.19-.79h-.14a1.58 1.58 0 010-3.16h.07a1.3 1.3 0 001.19-.85 1.3 1.3 0 00-.26-1.43l-.05-.05a1.58 1.58 0 112.23-2.23l.05.05a1.3 1.3 0 001.43.26h.06a1.3 1.3 0 00.79-1.19v-.14a1.58 1.58 0 013.16 0v.07a1.3 1.3 0 00.79 1.19 1.3 1.3 0 001.43-.26l.05-.05a1.58 1.58 0 112.23 2.23l-.05.05a1.3 1.3 0 00-.26 1.43v.06a1.3 1.3 0 001.19.79h.14a1.58 1.58 0 010 3.16h-.07a1.3 1.3 0 00-1.19.79z"
+        stroke="currentColor" stroke-width="1.5" />
+    </svg>
+  </button>
+
+  <!-- Context Menu -->
+  <div id="context-menu" class="context-menu hidden">
+    <button data-action="add-link">➕ Thêm link</button>
+    <button data-action="add-group">📁 Thêm nhóm</button>
+    <div class="ctx-sep"></div>
+    <button data-action="edit" class="ctx-link-only">✏️ Sửa</button>
+    <button data-action="delete" class="ctx-link-only">🗑️ Xoá</button>
+  </div>
+
+  <!-- Modal: Add / Edit Link -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h3 id="modal-title">Thêm liên kết</h3>
+      <div id="modal-body-link">
+        <label>URL
+          <input type="url" id="input-url" placeholder="https://example.com" autocomplete="off">
+        </label>
+        <label>Tên (tự động nếu bỏ trống)
+          <input type="text" id="input-name" placeholder="Tên hiển thị" autocomplete="off">
+        </label>
+        <label>Nhóm
+          <select id="input-group"></select>
+        </label>
+      </div>
+      <div id="modal-body-group" class="hidden">
+        <label>Tên nhóm
+          <input type="text" id="input-group-name" placeholder="Tên nhóm mới" autocomplete="off">
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button id="modal-cancel">Huỷ</button>
+        <button id="modal-save">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div id="settings-overlay" class="modal-overlay hidden">
+    <div class="modal settings-modal">
+      <h3>Cài đặt</h3>
+
+      <label>Kích thước icon
+        <input type="range" id="setting-icon-size" min="32" max="80" value="56" step="2">
+        <span id="setting-icon-size-val">56px</span>
+      </label>
+
+
+      <div class="settings-section">
+        <h4>Quản lý nhóm</h4>
+        <div id="settings-group-list"></div>
+        <button id="settings-add-group" class="btn-flat">+ Thêm nhóm</button>
+      </div>
+      <div class="settings-section">
+        <h4>Đồng bộ GitHub Gist</h4>
+        <label>GitHub Token
+          <input type="text" id="setting-gist-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+        </label>
+        <label>Gist ID (tự tạo nếu bỏ trống)
+          <input type="text" id="setting-gist-id" placeholder="Gist ID" autocomplete="off">
+        </label>
+        <div class="sync-actions">
+          <button id="sync-push" class="btn-sync">⬆ Đẩy lên</button>
+          <button id="sync-pull" class="btn-sync">⬇ Kéo về</button>
+        </div>
+        <div id="sync-status" class="sync-status"></div>
+      </div>
+
+      <div class="settings-section">
+        <h4>Floating Video Player</h4>
+
+        <div class="settings-grid">
+          <label>Độ nhạy video dài
+            <input type="number" id="setting-video-swipe-long" min="0.05" max="2" step="0.05">
+          </label>
+
+          <label>Độ nhạy video ngắn
+            <input type="number" id="setting-video-swipe-short" min="0.05" max="2" step="0.05">
+          </label>
+
+          <label>Khoảng vuốt tối thiểu
+            <input type="number" id="setting-video-min-swipe-distance" min="10" max="100" step="5">
+          </label>
+
+          <label>Giới hạn lệch dọc
+            <input type="number" id="setting-video-vertical-tolerance" min="20" max="200" step="5">
+          </label>
+
+          <label>Ngưỡng chéo
+            <input type="number" id="setting-video-diagonal-threshold" min="1" max="3" step="0.1">
+          </label>
+
+          <label>Ngưỡng video ngắn (ms)
+            <input type="number" id="setting-video-short-threshold" min="50" max="1000" step="10">
+          </label>
+
+          <label>Tần suất preview (ms)
+            <input type="number" id="setting-video-throttle" min="1" max="100" step="1">
+          </label>
+
+          <label>Bước tua phím tắt (giây)
+            <input type="number" id="setting-video-forward-step" min="1" max="60" step="1">
+          </label>
+
+          <label>Mức tăng âm hiện tại
+            <input type="number" id="setting-video-boost-level" min="1" max="5" step="1">
+          </label>
+
+          <label>Mức tăng âm tối đa
+            <input type="number" id="setting-video-max-boost" min="1" max="10" step="1">
+          </label>
+
+          <label>Cỡ chữ thông báo seek
+            <input type="number" id="setting-video-notice-font-size" min="10" max="32" step="1">
+          </label>
+        </div>
+
+        <div class="settings-toggle-list">
+          <label class="toggle-setting-row">
+            <span>
+              Preview theo thời gian thực
+              <small>Cập nhật vị trí video ngay khi đang vuốt</small>
+            </span>
+            <input type="checkbox" id="setting-video-realtime-preview">
+          </label>
+
+          <label class="toggle-setting-row">
+            <span>
+              Bật phím tắt video
+              <small>Dùng phím mũi tên để tua, phím B để boost âm lượng</small>
+            </span>
+            <input type="checkbox" id="setting-video-hotkeys">
+          </label>
+
+          <label class="toggle-setting-row">
+            <span>
+              Bật audio boost
+              <small>Cho phép tăng âm lượng vượt mức 100%</small>
+            </span>
+            <input type="checkbox" id="setting-video-boost">
+          </label>
+        </div>
+
+        <div id="video-settings-status" class="settings-note"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="settings-close">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="index.js"></script>
+</body>
+
+</html>

@@ -5,25 +5,85 @@
   "description": "Custom new tab page with grouped quicklinks",
   "incognito": "split",
   "chrome_url_overrides": {
-    "newtab": "newtab.html"
+    "newtab": "src/newtab/index.html"
   },
   "permissions": [
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "activeTab"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "css": [
+        "src/content/cookie-bypass/styles.css"
+      ],
+      "js": [
+        "src/content/cookie-bypass/index.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "css": [
+        "src/content/video-floating/styles.css"
+      ],
+      "js": [
+        "src/content/video-floating/index.js"
+      ],
+      "run_at": "document_end",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/video-floating/page-api.js"
+      ],
+      "run_at": "document_end",
+      "all_frames": true,
+      "world": "MAIN"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/video-floating/app.js",
+        "src/content/video-floating/constants.js",
+        "src/content/video-floating/utils.js",
+        "src/content/video-floating/config.js",
+        "src/content/video-floating/controls-core.js",
+        "src/content/video-floating/persistence.js",
+        "src/content/video-floating/menu-quality.js",
+        "src/content/video-floating/state.js",
+        "src/content/video-floating/video-management.js",
+        "src/content/video-floating/iframe-helpers.js",
+        "src/content/video-floating/iframe-mode.js",
+        "src/content/video-floating/events.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background/index.js"
   },
   "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
   },
   "action": {
     "default_icon": {
-      "16": "icon16.png",
-      "48": "icon48.png",
-      "128": "icon128.png"
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
     }
   }
 }

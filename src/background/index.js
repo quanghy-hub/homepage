@@ -94,5 +94,5 @@ function extractTitle(url, fallbackTitle) {
 // Mở trang Homepage (newtab.html) khi click vào icon trên thanh Toolbar,
 // rất hữu ích cho chế độ Incognito vì Chrome chặn override newtab ở chế độ này.
 chrome.action.onClicked.addListener((tab) => {
-  chrome.tabs.create({ url: "newtab.html" });
+  chrome.tabs.create({ url: "src/newtab/index.html" });
 });

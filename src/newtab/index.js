@@ -1,71 +1,26 @@
+import { DEFAULT_GROUPS, DEFAULT_LINKS, DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
+import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
+import { VIDEO_DEFAULT_SETTINGS } from '../shared/constants/video-settings.js';
+import { getFavicon, autoTitle } from '../shared/utils/link-utils.js';
+import { getDomRefs } from './dom.js';
+import { loadAppData, saveAppData, saveVideoSettings as persistVideoSettings } from './storage.js';
+import { bindContextMenu } from './context-menu.js';
+import {
+  setSyncStatus as updateSyncStatus,
+  getGistHeaders,
+  bindGistCredentialInputs,
+  loadSavedGistCredentials,
+  buildExportData
+} from './gist-sync.js';
+import {
+  setVideoSettingsStatus as updateVideoSettingsStatus,
+  renderVideoSettings as renderVideoSettingsUI,
+  bindVideoSettingsControls as bindVideoSettingsUI,
+  handleVideoStorageChange
+} from './video-settings.js';
+
 (() => {
   'use strict';
-
-  /* ========== DEFAULT DATA ========== */
-  const DEFAULT_GROUPS = {
-    list: ['A', '☓ ', 'D', 'C', 'B', 'E'],
-    pinned: ['A'], // Array of pinned group names
-    selected: '☓ '
-  };
-
-  const DEFAULT_LINKS = [
-    { _id: 'linksirdilh', order: 0, parent: 'A', title: 'Alpha123', url: 'https://alpha123.uk/' },
-    { _id: 'linkspjqank', order: 1, parent: 'A', title: 'Phần mềm', url: 'https://voz.vn/f/phan-mem.13/' },
-    { _id: 'linksiaildg', order: 2, parent: 'A', title: 'Điểm báo', url: 'https://voz.vn/f/diem-bao.33/' },
-    { _id: 'linksjkobho', order: 3, parent: 'A', title: 'Tiền điện tử', url: 'https://voz.vn/f/tien-dien-tu.94/' },
-    { _id: 'linksmhdkob', order: 4, parent: 'A', title: 'TikTok', url: 'https://www.tiktok.com/' },
-    { _id: 'linkspdgigl', order: 5, parent: 'A', title: 'Google Drive', url: 'https://drive.google.com/drive/u/0/shared-with-me' },
-    { _id: 'linksdrfjea', order: 6, parent: 'A', title: 'X', url: 'https://x.com/home' },
-    { _id: 'linksifdjnm', order: 7, parent: 'A', title: 'Reddit', url: 'https://www.reddit.com/' },
-    { _id: 'linksbajhdk', order: 8, parent: 'A', title: 'YouTube', url: 'https://m.youtube.com/' },
-    { _id: 'linksihghle', order: 9, parent: 'A', title: 'Music', url: 'https://music.youtube.com/' },
-    { _id: 'linksjllafc', order: 10, parent: 'A', title: 'Keep', url: 'https://keep.google.com/' },
-    { _id: 'linkseqcapk', order: 11, parent: 'A', title: 'LiteApks', url: 'https://Liteapks.com' },
-    { _id: 'linksrmodic', order: 12, parent: 'A', title: 'Facebook', url: 'https://www.facebook.com/' },
-    { _id: 'linkslmqnkk', order: 13, parent: 'A', title: 'CoinGecko', url: 'https://www.coingecko.com/' },
-    { _id: 'linksqglcbe', order: 14, parent: 'A', title: 'CoinMarket', url: 'https://coinmarketcap.com/' },
-    { _id: 'linksakhirh', order: 15, parent: 'A', title: 'GitHub', url: 'https://github.com/' },
-
-    { _id: 'linksopffim', order: 0, parent: '☓ ', title: 'ChatGPT', url: 'https://chatgpt.com' },
-    { _id: 'linksckcgld', order: 1, parent: '☓ ', title: 'NotebookLM', url: 'https://notebooklm.google.com/' },
-    { _id: 'linksofclid', order: 2, parent: '☓ ', title: 'Perplexity', url: 'https://www.perplexity.ai/' },
-    { _id: 'linksekhmnb', order: 3, parent: '☓ ', title: 'AI Studio', url: 'https://aistudio.google.com/' },
-    { _id: 'linksicqqko', order: 4, parent: '☓ ', title: 'Gemini', url: 'https://gemini.google.com/' },
-    { _id: 'linksljpijl', order: 5, parent: '☓ ', title: 'Qwen', url: 'https://chat.qwen.ai/' },
-    { _id: 'linksnkofpq', order: 6, parent: '☓ ', title: 'Grok', url: 'https://grok.com/' },
-    { _id: 'linksebpgen', order: 7, parent: '☓ ', title: 'Poe', url: 'https://poe.com/' },
-    { _id: 'linksdmflab', order: 8, parent: '☓ ', title: 'DeepSeek', url: 'https://chat.deepseek.com' },
-    { _id: 'linksedamjh', order: 9, parent: '☓ ', title: 'Claude', url: 'https://claude.ai/new' },
-    { _id: 'linksmejbmo', order: 10, parent: '☓ ', title: 'Kimi', url: 'https://www.kimi.com/' },
-    { _id: 'linksfbbmpd', order: 11, parent: '☓ ', title: 'AI Studio Chat', url: 'https://aistudio.google.com/prompts/new_chat' },
-    { _id: 'linksnojfhm', order: 12, parent: '☓ ', title: 'Z.AI', url: 'https://chat.z.ai/' },
-
-    { _id: 'linkslqqmfc', order: 0, parent: 'C', title: 'CME Đăng ký', url: 'https://cme.bvhungvuong.vn/course/DangKyDT' },
-    { _id: 'linksomcfqn', order: 1, parent: 'C', title: 'Chỉ đạo tuyến', url: 'http://choray.vn/ttchidaotuyen/Default.aspx?tabid=277&language=vi-VN' },
-    { _id: 'linkshqrpig', order: 2, parent: 'C', title: 'CME Courses', url: 'https://cme.bvhungvuong.vn/Course/Index' },
-    { _id: 'linksodedll', order: 3, parent: 'C', title: 'CTUMP', url: 'https://htql.ctump.edu.vn/ctump/dichvucong/ttdv/' },
-    { _id: 'linksdgaggl', order: 4, parent: 'C', title: 'Dịch vụ công', url: 'https://dichvucong.gov.vn/p/home/dvc-dich-vu-cong-cua-toi.html' },
-    { _id: 'linksqbpgdd', order: 5, parent: 'C', title: 'Ente Auth', url: 'https://auth.ente.io/auth' },
-
-    { _id: 'linksegljrm', order: 0, parent: 'D', title: 'TheFetus', url: 'https://thefetus.net/' },
-    { _id: 'linksqgqqja', order: 1, parent: 'D', title: 'RIS', url: 'http://113.161.160.233/ris/study/reading' },
-    { _id: 'linkshhlpmc', order: 2, parent: 'D', title: 'Radiology Asst', url: 'https://radiologyassistant.nl/' },
-    { _id: 'linksllqbih', order: 3, parent: 'D', title: 'Radiopaedia', url: 'https://radiopaedia.org/search?page=1&scope=articles&section=Classifications&sort=date_of_last_edit&system=Gynaecology' },
-    { _id: 'linksnbakpc', order: 4, parent: 'D', title: 'Radiopaedia User', url: 'https://radiopaedia.org/users/maulikspatel' },
-    { _id: 'linksnpjmgk', order: 5, parent: 'D', title: 'PACS HMU', url: 'https://pacs.benhviendaihocyhanoi.com/ris/study/reading#listStudy' },
-    { _id: 'linkslnjldf', order: 6, parent: 'D', title: 'YDS', url: 'https://pacs.umc.edu.vn/portal/' },
-    { _id: 'linksrfmmka', order: 7, parent: 'D', title: 'CR', url: 'https://bvcr.ddns.net/portal/' },
-    { _id: 'linksoagblo', order: 8, parent: 'D', title: 'Ultrasound', url: 'https://www.ultrasoundcases.info/cases' },
-
-    { _id: 'linksbokpll', order: 16, parent: 'E', title: 'Telegram', url: 'https://web.telegram.org/a/' },
-    { _id: 'linkscjncge', order: 17, parent: 'E', title: 'Notion', url: 'https://www.notion.so/23ee294244cd4904ace8a548a8ffd74e' },
-    { _id: 'linkslaabcd', order: 18, parent: 'E', title: 'Transfer.it', url: 'https://transfer.it/start' },
-    { _id: 'linksdjinjd', order: 19, parent: 'E', title: 'Chợ Tốt', url: 'https://www.chotot.com/' }
-  ];
-
-  const DEFAULT_SETTINGS = {
-    iconSize: 56
-  };
 
   /* ========== STATE ========== */
   let links = [];
@@ -79,73 +34,72 @@
   let modalMode = null; // 'add-link', 'edit-link', 'add-group'
 
   /* ========== DOM REFS ========== */
-  const pinnedGrid = document.getElementById('pinned-grid');
-  const groupTabs = document.getElementById('group-tabs');
-  const selectedGrid = document.getElementById('selected-grid');
-  const settingsBtn = document.getElementById('settings-btn');
-  const contextMenu = document.getElementById('context-menu');
-  const modalOverlay = document.getElementById('modal-overlay');
-  const modalTitle = document.getElementById('modal-title');
-  const modalBodyLink = document.getElementById('modal-body-link');
-  const modalBodyGroup = document.getElementById('modal-body-group');
-  const inputUrl = document.getElementById('input-url');
-  const inputName = document.getElementById('input-name');
-  const inputGroup = document.getElementById('input-group');
-  const inputGroupName = document.getElementById('input-group-name');
-  const modalCancel = document.getElementById('modal-cancel');
-  const modalSave = document.getElementById('modal-save');
-  const settingsOverlay = document.getElementById('settings-overlay');
-  const settingIconSize = document.getElementById('setting-icon-size');
-  const settingIconSizeVal = document.getElementById('setting-icon-size-val');
-  const settingsGroupList = document.getElementById('settings-group-list');
-  const settingsAddGroup = document.getElementById('settings-add-group');
-  const settingsClose = document.getElementById('settings-close');
+  const dom = getDomRefs();
+  const {
+    pinnedGrid,
+    groupTabs,
+    selectedGrid,
+    settingsBtn,
+    contextMenu,
+    modalOverlay,
+    modalTitle,
+    modalBodyLink,
+    modalBodyGroup,
+    inputUrl,
+    inputName,
+    inputGroup,
+    inputGroupName,
+    modalCancel,
+    modalSave,
+    settingsOverlay,
+    settingIconSize,
+    settingIconSizeVal,
+    settingsGroupList,
+    settingsAddGroup,
+    settingsClose,
+    videoSettingsStatus,
+    videoSettingInputs,
+    videoSettingToggles,
+    gistTokenInput,
+    gistIdInput,
+    syncPush,
+    syncPull,
+    syncStatus
+  } = dom;
+  let videoSettings = { ...VIDEO_DEFAULT_SETTINGS };
 
   /* ========== STORAGE HELPERS ========== */
   function loadData() {
-    return new Promise(resolve => {
-      chrome.storage.local.get(['links', 'groups', 'settings'], result => {
-        if (result.links && result.links.length > 0) {
-          links = result.links;
-          groups = result.groups || JSON.parse(JSON.stringify(DEFAULT_GROUPS));
-          // Migrate pinned from string to array if needed
-          if (typeof groups.pinned === 'string') {
-            groups.pinned = [groups.pinned];
-          }
-        } else {
-          links = JSON.parse(JSON.stringify(DEFAULT_LINKS));
-          groups = JSON.parse(JSON.stringify(DEFAULT_GROUPS));
-        }
-        settings = Object.assign({}, DEFAULT_SETTINGS, result.settings || {});
-        selectedGroup = groups.selected || groups.list.find(g => !groups.pinned.includes(g)) || groups.list[0];
-        resolve();
-      });
+    const state = { links, groups, settings, videoSettings, selectedGroup };
+    return loadAppData(state).then(() => {
+      links = state.links;
+      groups = state.groups;
+      settings = state.settings;
+      videoSettings = state.videoSettings;
+      selectedGroup = state.selectedGroup;
     });
   }
 
   function saveData() {
-    chrome.storage.local.set({ links, groups, settings });
+    saveAppData({ links, groups, settings });
   }
 
-  /* ========== FAVICON ========== */
-  function getFavicon(url) {
-    try {
-      const u = new URL(url);
-      return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=128`;
-    } catch {
-      return '';
-    }
+  function setVideoSettingsStatus(message, type = '') {
+    updateVideoSettingsStatus(dom, message, type);
   }
 
-  function autoTitle(url) {
-    try {
-      const u = new URL(url);
-      const parts = u.hostname.replace(/^(www\.|m\.)/, '').split('.');
-      const name = parts.length > 1 ? parts[parts.length - 2] : parts[0];
-      return name.charAt(0).toUpperCase() + name.slice(1);
-    } catch {
-      return 'Link';
-    }
+  function renderVideoSettings() {
+    renderVideoSettingsUI(dom, { videoSettings });
+  }
+
+  function saveVideoSettings() {
+    persistVideoSettings({ videoSettings }, () => {
+      setVideoSettingsStatus('Đã lưu cài đặt Floating Video Player.', 'ok');
+    });
+  }
+
+  function bindVideoSettingsControls() {
+    bindVideoSettingsUI(dom, { videoSettings }, saveVideoSettings);
   }
 
   /* ========== CSS VARS ========== */
@@ -468,48 +422,20 @@
     contextGroup = null;
   }
 
-  // Right-click on empty area of page
-  document.addEventListener('contextmenu', e => {
-    // Only if not on a link-item (those have stopPropagation)
-    if (!e.target.closest('.link-item') && !e.target.closest('.context-menu') && !e.target.closest('.modal') && !e.target.closest('.settings-modal')) {
-      e.preventDefault();
-      // Determine which group area we're in
-      let group = selectedGroup;
-      const pinnedEl = e.target.closest('.links-grid[data-group]');
-      if (pinnedEl && groups.pinned.includes(pinnedEl.dataset.group)) {
-        group = pinnedEl.dataset.group;
-      }
-      showContextMenu(e.pageX, e.pageY, null, group);
-    }
-  });
-
-  document.addEventListener('click', e => {
-    if (!contextMenu.contains(e.target)) hideContextMenu();
-  });
-
-  contextMenu.querySelector('[data-action="add-link"]').addEventListener('click', () => {
-    const group = contextGroup || selectedGroup;
-    hideContextMenu();
-    openModal('add-link', null, group);
-  });
-
-  contextMenu.querySelector('[data-action="add-group"]').addEventListener('click', () => {
-    hideContextMenu();
-    openModal('add-group');
-  });
-
-  contextMenu.querySelector('[data-action="edit"]').addEventListener('click', () => {
-    const link = links.find(l => l._id === contextLinkId);
-    if (!link) return;
-    hideContextMenu();
-    openModal('edit-link', link);
-  });
-
-  contextMenu.querySelector('[data-action="delete"]').addEventListener('click', () => {
-    links = links.filter(l => l._id !== contextLinkId);
-    hideContextMenu();
-    saveData();
-    render();
+  bindContextMenu({
+    documentRef: document,
+    contextMenu,
+    getSelectedGroup: () => contextGroup || selectedGroup,
+    getGroups: () => groups,
+    showContextMenu,
+    hideContextMenu,
+    setContextLinkId: value => { contextLinkId = value; },
+    getContextLinkId: () => contextLinkId,
+    setLinks: value => { links = value; },
+    getLinks: () => links,
+    saveData,
+    render,
+    openModal
   });
 
   /* ========== MODAL ========== */
@@ -653,11 +579,8 @@
     settingIconSize.value = settings.iconSize;
     settingIconSizeVal.textContent = settings.iconSize + 'px';
     renderGroupList();
-    // Load saved gist credentials
-    chrome.storage.local.get(['gistToken', 'gistId'], result => {
-      if (result.gistToken) gistTokenInput.value = result.gistToken;
-      if (result.gistId) gistIdInput.value = result.gistId;
-    });
+    renderVideoSettings();
+    loadSavedGistCredentials(dom);
   }
 
   function closeSettings() {
@@ -759,42 +682,14 @@
   });
 
   /* ========== GIST SYNC ========== */
-  const gistTokenInput = document.getElementById('setting-gist-token');
-  const gistIdInput = document.getElementById('setting-gist-id');
-  const syncPush = document.getElementById('sync-push');
-  const syncPull = document.getElementById('sync-pull');
-  const syncStatus = document.getElementById('sync-status');
 
   function setSyncStatus(msg, type = '') {
-    syncStatus.textContent = msg;
-    syncStatus.className = 'sync-status' + (type ? ' ' + type : '');
-  }
-
-  function getGistHeaders() {
-    const token = gistTokenInput.value.trim();
-    if (!token) return null;
-    return {
-      'Authorization': 'token ' + token,
-      'Accept': 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    };
-  }
-
-  // Save token & gist ID immediately when user types
-  gistTokenInput.addEventListener('input', () => {
-    chrome.storage.local.set({ gistToken: gistTokenInput.value.trim() });
-  });
-  gistIdInput.addEventListener('input', () => {
-    chrome.storage.local.set({ gistId: gistIdInput.value.trim() });
-  });
-
-  function buildExportData() {
-    return { links, groups, settings };
+    updateSyncStatus(dom, msg, type);
   }
 
   // Push to Gist
   syncPush.addEventListener('click', async () => {
-    const headers = getGistHeaders();
+    const headers = getGistHeaders(dom);
     if (!headers) { setSyncStatus('Nhập token trước', 'err'); return; }
 
     syncPush.disabled = true;
@@ -805,7 +700,7 @@
       public: false,
       files: {
         'quicklinks_data.json': {
-          content: JSON.stringify(buildExportData(), null, 2)
+          content: JSON.stringify(buildExportData({ links, groups, settings }), null, 2)
         }
       }
     };
@@ -851,7 +746,7 @@
 
   // Pull from Gist
   syncPull.addEventListener('click', async () => {
-    const headers = getGistHeaders();
+    const headers = getGistHeaders(dom);
     if (!headers) { setSyncStatus('Nhập token trước', 'err'); return; }
 
     const gistId = gistIdInput.value.trim();
@@ -888,6 +783,7 @@
       settingIconSize.value = settings.iconSize;
       settingIconSizeVal.textContent = settings.iconSize + 'px';
       renderGroupList();
+      renderVideoSettings();
 
       setSyncStatus('✓ Kéo về thành công · ' + new Date().toLocaleTimeString(), 'ok');
     } catch (err) {
@@ -929,9 +825,20 @@
       links = changes.links.newValue || [];
       render();
     }
+
+    if (area === 'local' && changes[STORAGE_KEYS.videoSettings]) {
+      handleVideoStorageChange({ videoSettings }, changes);
+      videoSettings = Object.assign({}, VIDEO_DEFAULT_SETTINGS, changes[STORAGE_KEYS.videoSettings].newValue || {});
+      renderVideoSettings();
+    }
   });
 
   /* ========== INIT ========== */
-  loadData().then(() => render());
+  bindGistCredentialInputs(dom);
+  bindVideoSettingsControls();
+  loadData().then(() => {
+    render();
+    renderVideoSettings();
+  });
 
 })();
