@@ -1,13 +1,33 @@
 /* ========== CONTEXT MENU: Add to Homepage ========== */
 
-// Create context menu item on install/update
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'add-to-homepage',
-    title: 'Thêm vào Homepage',
-    contexts: ['page', 'link']
+function safeBadge(tabId, text, color) {
+  if (typeof tabId !== 'number') return;
+  chrome.action.setBadgeText({ text, tabId }, () => void chrome.runtime.lastError);
+  if (color) {
+    chrome.action.setBadgeBackgroundColor({ color, tabId }, () => void chrome.runtime.lastError);
+  }
+}
+
+function clearBadgeLater(tabId, delay = 2000) {
+  if (typeof tabId !== 'number') return;
+  setTimeout(() => {
+    chrome.action.setBadgeText({ text: '', tabId }, () => void chrome.runtime.lastError);
+  }, delay);
+}
+
+function createHomepageContextMenu() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'add-to-homepage',
+      title: 'Thêm vào Homepage',
+      contexts: ['page', 'link']
+    }, () => void chrome.runtime.lastError);
   });
-});
+}
+
+// Create context menu item on install/update/startup
+chrome.runtime.onInstalled.addListener(createHomepageContextMenu);
+chrome.runtime.onStartup.addListener(createHomepageContextMenu);
 
 // Default data (same as newtab.js) for first-time fallback
 const BG_DEFAULT_GROUPS = {
@@ -21,8 +41,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== 'add-to-homepage') return;
 
   // Determine URL and title
-  const url = info.linkUrl || info.pageUrl || tab.url;
-  const title = tab.title || extractTitle(url);
+  const url = info.linkUrl || info.pageUrl || tab?.url;
+  if (!url) {
+    safeBadge(tab?.id, '✗', '#f85149');
+    clearBadgeLater(tab?.id);
+    return;
+  }
+
+  const title = info.selectionText?.trim() || tab?.title || extractTitle(url);
 
   chrome.storage.local.get(['links', 'groups'], result => {
     const links = result.links || [];
@@ -41,9 +67,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     // Check for duplicate URL in same group
     const isDuplicate = links.some(l => l.url === url && l.parent === targetGroup);
     if (isDuplicate) {
-      chrome.action.setBadgeText({ text: '✗', tabId: tab.id });
-      chrome.action.setBadgeBackgroundColor({ color: '#f85149', tabId: tab.id });
-      setTimeout(() => chrome.action.setBadgeText({ text: '', tabId: tab.id }), 2000);
+      safeBadge(tab?.id, '✗', '#f85149');
+      clearBadgeLater(tab?.id);
       return;
     }
 
@@ -60,10 +85,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     });
 
     chrome.storage.local.set({ links }, () => {
+      if (chrome.runtime.lastError) {
+        safeBadge(tab?.id, '✗', '#f85149');
+        clearBadgeLater(tab?.id);
+        return;
+      }
+
       // Show success badge
-      chrome.action.setBadgeText({ text: '✓', tabId: tab.id });
-      chrome.action.setBadgeBackgroundColor({ color: '#3fb950', tabId: tab.id });
-      setTimeout(() => chrome.action.setBadgeText({ text: '', tabId: tab.id }), 2000);
+      safeBadge(tab?.id, '✓', '#3fb950');
+      clearBadgeLater(tab?.id);
     });
   });
 });
@@ -91,8 +121,51 @@ function extractTitle(url, fallbackTitle) {
 }
 
 // ========== ACTION: Click vào icon Extension ==========
-// Mở trang Homepage (newtab.html) khi click vào icon trên thanh Toolbar,
-// rất hữu ích cho chế độ Incognito vì Chrome chặn override newtab ở chế độ này.
+// Mobile thường không hỗ trợ context menu của extension,
+// nên click icon sẽ thêm luôn tab hiện tại vào Homepage.
 chrome.action.onClicked.addListener((tab) => {
-  chrome.tabs.create({ url: "src/newtab/index.html" });
+  const url = tab?.url;
+  if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
+    chrome.tabs.create({ url: 'src/newtab/index.html' });
+    return;
+  }
+
+  chrome.storage.local.get(['links', 'groups'], result => {
+    const links = result.links || [];
+    const groups = result.groups || JSON.parse(JSON.stringify(BG_DEFAULT_GROUPS));
+
+    if (typeof groups.pinned === 'string') {
+      groups.pinned = [groups.pinned];
+    }
+
+    const targetGroup = (groups.pinned && groups.pinned.length > 0)
+      ? groups.pinned[0]
+      : groups.list[0];
+
+    const isDuplicate = links.some(l => l.url === url && l.parent === targetGroup);
+    if (isDuplicate) {
+      safeBadge(tab.id, '✗', '#f85149');
+      clearBadgeLater(tab.id);
+      return;
+    }
+
+    const groupLinks = links.filter(l => l.parent === targetGroup);
+    links.push({
+      _id: 'links' + Math.random().toString(36).slice(2, 10),
+      order: groupLinks.length,
+      parent: targetGroup,
+      title: extractTitle(url, tab.title),
+      url
+    });
+
+    chrome.storage.local.set({ links }, () => {
+      if (chrome.runtime.lastError) {
+        safeBadge(tab.id, '✗', '#f85149');
+        clearBadgeLater(tab.id);
+        return;
+      }
+      safeBadge(tab.id, '✓', '#3fb950');
+      clearBadgeLater(tab.id);
+    });
+  });
 });

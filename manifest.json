@@ -50,27 +50,6 @@
       "world": "MAIN"
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "src/content/video-floating/app.js",
-        "src/content/video-floating/constants.js",
-        "src/content/video-floating/utils.js",
-        "src/content/video-floating/config.js",
-        "src/content/video-floating/controls-core.js",
-        "src/content/video-floating/persistence.js",
-        "src/content/video-floating/menu-quality.js",
-        "src/content/video-floating/state.js",
-        "src/content/video-floating/video-management.js",
-        "src/content/video-floating/iframe-helpers.js",
-        "src/content/video-floating/iframe-mode.js",
-        "src/content/video-floating/events.js"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
-  ],
   "background": {
     "service_worker": "src/background/index.js"
   },

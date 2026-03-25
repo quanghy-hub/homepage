@@ -6,6 +6,7 @@
     'use strict';
 
     const isInIframe = window !== window.top;
+    const FVP_IFRAME_BRIDGE = 'fvp-page-bridge';
 
     // ============================================
     // CONSTANTS
@@ -404,6 +405,18 @@
             try { window.parent.postMessage({ type: 'fvp-iframe-videos', count }, '*'); } catch (e) { }
         };
 
+        const requestPageQualityBridge = () => {
+            try {
+                window.postMessage({ source: FVP_IFRAME_BRIDGE, type: 'fvp-page-get-quality' }, '*');
+            } catch (e) { }
+        };
+
+        const setPageQualityBridge = item => {
+            try {
+                window.postMessage({ source: FVP_IFRAME_BRIDGE, type: 'fvp-page-set-quality', item }, '*');
+            } catch (e) { }
+        };
+
         window.addEventListener('fvp-quality-result', e => {
             try {
                 window.parent.postMessage({ type: 'fvp-iframe-quality-result', detail: e.detail || [] }, '*');
@@ -417,6 +430,15 @@
                 if (e.data.count > 0) childFrameVideoMap.set(childIframe, e.data.count);
                 else childFrameVideoMap.delete(childIframe);
                 reportVideos();
+                return;
+            }
+
+            if (e.source === window && e.data?.source === FVP_IFRAME_BRIDGE) {
+                if (e.data.type === 'fvp-page-quality-result') {
+                    try {
+                        window.parent.postMessage({ type: 'fvp-iframe-quality-result', detail: e.data.detail || [] }, '*');
+                    } catch (err) { }
+                }
                 return;
             }
 
@@ -456,10 +478,10 @@
                     applyIframeVideoPresentation();
                     break;
                 case 'get-quality':
-                    window.dispatchEvent(new CustomEvent('fvp-get-quality'));
+                    requestPageQualityBridge();
                     break;
                 case 'set-quality':
-                    window.dispatchEvent(new CustomEvent('fvp-set-quality', { detail: e.data.item }));
+                    setPageQualityBridge(e.data.item);
                     break;
             }
 
