@@ -1,5 +1,8 @@
 /* ========== CONTEXT MENU: Add to Homepage ========== */
 
+const HOMEPAGE_MENU_ID = 'add-to-homepage';
+const HOMEPAGE_LINK_MENU_ID = 'add-link-to-homepage';
+
 function safeBadge(tabId, text, color) {
   if (typeof tabId !== 'number') return;
   chrome.action.setBadgeText({ text, tabId }, () => void chrome.runtime.lastError);
@@ -18,9 +21,15 @@ function clearBadgeLater(tabId, delay = 2000) {
 function createHomepageContextMenu() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
-      id: 'add-to-homepage',
-      title: 'Thêm vào Homepage',
-      contexts: ['page', 'link']
+      id: HOMEPAGE_MENU_ID,
+      title: 'Thêm trang này vào Homepage',
+      contexts: ['page']
+    }, () => void chrome.runtime.lastError);
+
+    chrome.contextMenus.create({
+      id: HOMEPAGE_LINK_MENU_ID,
+      title: 'Thêm link này vào Homepage',
+      contexts: ['link']
     }, () => void chrome.runtime.lastError);
   });
 }
@@ -36,65 +45,77 @@ const BG_DEFAULT_GROUPS = {
   selected: '☓ '
 };
 
-// Handle click
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== 'add-to-homepage') return;
-
-  // Determine URL and title
-  const url = info.linkUrl || info.pageUrl || tab?.url;
-  if (!url) {
-    safeBadge(tab?.id, '✗', '#f85149');
-    clearBadgeLater(tab?.id);
-    return;
+function getTargetGroup(groups) {
+  if (typeof groups.pinned === 'string') {
+    groups.pinned = [groups.pinned];
   }
 
-  const title = info.selectionText?.trim() || tab?.title || extractTitle(url);
+  if (Array.isArray(groups.pinned) && groups.pinned.length > 0) {
+    return groups.pinned[0];
+  }
+
+  if (Array.isArray(groups.list) && groups.list.length > 0) {
+    return groups.list[0];
+  }
+
+  return BG_DEFAULT_GROUPS.pinned[0];
+}
+
+function addUrlToHomepage({ url, title, tabId }) {
+  if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
+    safeBadge(tabId, '✗', '#f85149');
+    clearBadgeLater(tabId);
+    return;
+  }
 
   chrome.storage.local.get(['links', 'groups'], result => {
     const links = result.links || [];
     const groups = result.groups || JSON.parse(JSON.stringify(BG_DEFAULT_GROUPS));
+    const targetGroup = getTargetGroup(groups);
 
-    // Migrate pinned from string to array if needed
-    if (typeof groups.pinned === 'string') {
-      groups.pinned = [groups.pinned];
-    }
-
-    // Target: first pinned group
-    const targetGroup = (groups.pinned && groups.pinned.length > 0)
-      ? groups.pinned[0]
-      : groups.list[0];
-
-    // Check for duplicate URL in same group
     const isDuplicate = links.some(l => l.url === url && l.parent === targetGroup);
     if (isDuplicate) {
-      safeBadge(tab?.id, '✗', '#f85149');
-      clearBadgeLater(tab?.id);
+      safeBadge(tabId, '✗', '#f85149');
+      clearBadgeLater(tabId);
       return;
     }
 
-    // Count existing links in target group for order
     const groupLinks = links.filter(l => l.parent === targetGroup);
-    const newId = 'links' + Math.random().toString(36).slice(2, 10);
-
     links.push({
-      _id: newId,
+      _id: 'links' + Math.random().toString(36).slice(2, 10),
       order: groupLinks.length,
       parent: targetGroup,
       title: extractTitle(url, title),
-      url: url
+      url
     });
 
     chrome.storage.local.set({ links }, () => {
       if (chrome.runtime.lastError) {
-        safeBadge(tab?.id, '✗', '#f85149');
-        clearBadgeLater(tab?.id);
+        safeBadge(tabId, '✗', '#f85149');
+        clearBadgeLater(tabId);
         return;
       }
 
-      // Show success badge
-      safeBadge(tab?.id, '✓', '#3fb950');
-      clearBadgeLater(tab?.id);
+      safeBadge(tabId, '✓', '#3fb950');
+      clearBadgeLater(tabId);
     });
+  });
+}
+
+// Handle click
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== HOMEPAGE_MENU_ID && info.menuItemId !== HOMEPAGE_LINK_MENU_ID) return;
+
+  const isLinkMenu = info.menuItemId === HOMEPAGE_LINK_MENU_ID;
+  const url = isLinkMenu ? info.linkUrl : (info.pageUrl || tab?.url);
+  const title = isLinkMenu
+    ? (info.selectionText?.trim() || info.linkText?.trim() || tab?.title || extractTitle(url))
+    : (tab?.title || extractTitle(url));
+
+  addUrlToHomepage({
+    url,
+    title,
+    tabId: tab?.id
   });
 });
 
@@ -130,42 +151,9 @@ chrome.action.onClicked.addListener((tab) => {
     return;
   }
 
-  chrome.storage.local.get(['links', 'groups'], result => {
-    const links = result.links || [];
-    const groups = result.groups || JSON.parse(JSON.stringify(BG_DEFAULT_GROUPS));
-
-    if (typeof groups.pinned === 'string') {
-      groups.pinned = [groups.pinned];
-    }
-
-    const targetGroup = (groups.pinned && groups.pinned.length > 0)
-      ? groups.pinned[0]
-      : groups.list[0];
-
-    const isDuplicate = links.some(l => l.url === url && l.parent === targetGroup);
-    if (isDuplicate) {
-      safeBadge(tab.id, '✗', '#f85149');
-      clearBadgeLater(tab.id);
-      return;
-    }
-
-    const groupLinks = links.filter(l => l.parent === targetGroup);
-    links.push({
-      _id: 'links' + Math.random().toString(36).slice(2, 10),
-      order: groupLinks.length,
-      parent: targetGroup,
-      title: extractTitle(url, tab.title),
-      url
-    });
-
-    chrome.storage.local.set({ links }, () => {
-      if (chrome.runtime.lastError) {
-        safeBadge(tab.id, '✗', '#f85149');
-        clearBadgeLater(tab.id);
-        return;
-      }
-      safeBadge(tab.id, '✓', '#3fb950');
-      clearBadgeLater(tab.id);
-    });
+  addUrlToHomepage({
+    url,
+    title: tab?.title,
+    tabId: tab?.id
   });
 });
