@@ -142,18 +142,9 @@ function extractTitle(url, fallbackTitle) {
 }
 
 // ========== ACTION: Click vào icon Extension ==========
-// Mobile thường không hỗ trợ context menu của extension,
-// nên click icon sẽ thêm luôn tab hiện tại vào Homepage.
-chrome.action.onClicked.addListener((tab) => {
-  const url = tab?.url;
-  if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
-    chrome.tabs.create({ url: 'src/newtab/index.html' });
-    return;
-  }
-
-  addUrlToHomepage({
-    url,
-    title: tab?.title,
-    tabId: tab?.id
-  });
+// Luôn mở Homepage/new tab khi bấm icon extension.
+// Tránh xung đột với logic add-to-homepage đang dùng badge ✓/✗,
+// vì trên một số site click icon trước đây sẽ bị hiểu là thao tác thêm link.
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({ url: 'src/newtab/index.html' });
 });
