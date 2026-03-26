@@ -61,10 +61,11 @@ function getTargetGroup(groups) {
   return BG_DEFAULT_GROUPS.pinned[0];
 }
 
-function addUrlToHomepage({ url, title, tabId }) {
+function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
   if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
     safeBadge(tabId, '✗', '#f85149');
     clearBadgeLater(tabId);
+    callback({ ok: false, reason: 'invalid-url' });
     return;
   }
 
@@ -77,6 +78,7 @@ function addUrlToHomepage({ url, title, tabId }) {
     if (isDuplicate) {
       safeBadge(tabId, '✗', '#f85149');
       clearBadgeLater(tabId);
+      callback({ ok: false, reason: 'duplicate', group: targetGroup });
       return;
     }
 
@@ -93,11 +95,13 @@ function addUrlToHomepage({ url, title, tabId }) {
       if (chrome.runtime.lastError) {
         safeBadge(tabId, '✗', '#f85149');
         clearBadgeLater(tabId);
+        callback({ ok: false, reason: 'storage-error' });
         return;
       }
 
       safeBadge(tabId, '✓', '#3fb950');
       clearBadgeLater(tabId);
+      callback({ ok: true, group: targetGroup });
     });
   });
 }
@@ -142,9 +146,41 @@ function extractTitle(url, fallbackTitle) {
 }
 
 // ========== ACTION: Click vào icon Extension ==========
-// Luôn mở Homepage/new tab khi bấm icon extension.
-// Tránh xung đột với logic add-to-homepage đang dùng badge ✓/✗,
-// vì trên một số site click icon trước đây sẽ bị hiểu là thao tác thêm link.
-chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: 'src/newtab/index.html' });
+// Android/Kiwi thường không có context menu extension ổn định,
+// nên click icon sẽ cố thêm tab hiện tại vào Homepage trước.
+// Nếu trang hiện tại không thêm được thì fallback mở Homepage/new tab.
+chrome.action.onClicked.addListener(async (tab) => {
+  let url = tab?.url;
+  let title = tab?.title;
+  const tabId = tab?.id;
+
+  // Fallback: trên Kiwi/Android, tab.url có thể undefined
+  // nếu activeTab không kích hoạt đúng qua menu trình duyệt.
+  if (!url && typeof tabId === 'number') {
+    try {
+      const freshTab = await chrome.tabs.get(tabId);
+      url = freshTab?.url;
+      title = freshTab?.title || title;
+    } catch (_) { /* ignore */ }
+  }
+
+  // Fallback 2: query active tab
+  if (!url) {
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      url = activeTab?.url;
+      title = activeTab?.title || title;
+    } catch (_) { /* ignore */ }
+  }
+
+  if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
+    chrome.tabs.create({ url: 'src/newtab/index.html' });
+    return;
+  }
+
+  addUrlToHomepage({ url, title, tabId }, result => {
+    if (!result?.ok) {
+      chrome.tabs.create({ url: 'src/newtab/index.html' });
+    }
+  });
 });
