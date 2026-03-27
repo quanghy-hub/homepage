@@ -87,6 +87,25 @@ import {
       .sort((a, b) => a.order - b.order);
   }
 
+  function insertLinkAtTop(groupName, linkData) {
+    links = links.map(existing =>
+      existing.parent === groupName
+        ? { ...existing, order: (Number.isFinite(existing.order) ? existing.order : 0) + 1 }
+        : existing
+    );
+
+    const newId = 'links' + Math.random().toString(36).slice(2, 10);
+    links.push({
+      _id: newId,
+      order: 0,
+      parent: groupName,
+      title: linkData.title,
+      url: linkData.url
+    });
+
+    return newId;
+  }
+
   function createLinkEl(link) {
     const el = document.createElement('a');
     el.className = 'link-item';
@@ -513,15 +532,7 @@ import {
         link.parent = group;
       }
     } else {
-      const groupLinks = getLinksForGroup(group);
-      const newId = 'links' + Math.random().toString(36).slice(2, 10);
-      links.push({
-        _id: newId,
-        order: groupLinks.length,
-        parent: group,
-        title,
-        url
-      });
+      insertLinkAtTop(group, { title, url });
     }
 
     saveData();
@@ -789,8 +800,30 @@ import {
 
   /* ========== AUTO-REFRESH ON EXTERNAL CHANGES ========== */
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.links) {
+    if (area !== 'local') return;
+
+    let shouldRender = false;
+
+    if (changes.links) {
       links = changes.links.newValue || [];
+      shouldRender = true;
+    }
+
+    if (changes.groups) {
+      groups = changes.groups.newValue || groups;
+      if (typeof groups.pinned === 'string') {
+        groups.pinned = [groups.pinned];
+      }
+      selectedGroup = groups.selected || groups.list.find(g => !groups.pinned.includes(g)) || groups.list[0];
+      shouldRender = true;
+    }
+
+    if (changes.settings) {
+      settings = Object.assign({}, DEFAULT_SETTINGS, changes.settings.newValue || {});
+      shouldRender = true;
+    }
+
+    if (shouldRender) {
       render();
     }
   });

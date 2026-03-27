@@ -61,6 +61,24 @@ function getTargetGroup(groups) {
   return BG_DEFAULT_GROUPS.pinned[0];
 }
 
+function insertLinkAtTop(links, targetGroup, link) {
+  const nextLinks = links.map(existing =>
+    existing.parent === targetGroup
+      ? { ...existing, order: (Number.isFinite(existing.order) ? existing.order : 0) + 1 }
+      : existing
+  );
+
+  nextLinks.push({
+    _id: 'links' + Math.random().toString(36).slice(2, 10),
+    order: 0,
+    parent: targetGroup,
+    title: link.title,
+    url: link.url
+  });
+
+  return nextLinks;
+}
+
 function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
   console.log('[Homepage] addUrlToHomepage called:', { url, title, tabId });
 
@@ -88,17 +106,13 @@ function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
       return;
     }
 
-    const groupLinks = links.filter(l => l.parent === targetGroup);
-    links.push({
-      _id: 'links' + Math.random().toString(36).slice(2, 10),
-      order: groupLinks.length,
-      parent: targetGroup,
+    const nextLinks = insertLinkAtTop(links, targetGroup, {
       title: extractTitle(url, title),
       url
     });
 
-    console.log('[Homepage] Saving', links.length, 'links...');
-    chrome.storage.local.set({ links }, () => {
+    console.log('[Homepage] Saving', nextLinks.length, 'links...');
+    chrome.storage.local.set({ links: nextLinks, groups }, () => {
       if (chrome.runtime.lastError) {
         console.error('[Homepage] Storage error:', chrome.runtime.lastError.message);
         safeBadge(tabId, '✗', '#f85149');
