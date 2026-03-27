@@ -3,6 +3,5 @@ export const STORAGE_KEYS = {
     groups: 'groups',
     settings: 'settings',
     gistToken: 'gistToken',
-    gistId: 'gistId',
-    videoSettings: 'VF_FINAL_V2'
+    gistId: 'gistId'
 };

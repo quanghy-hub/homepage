@@ -1,9 +1,8 @@
-import { DEFAULT_GROUPS, DEFAULT_LINKS, DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
+import { DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
-import { VIDEO_DEFAULT_SETTINGS } from '../shared/constants/video-settings.js';
 import { getFavicon, autoTitle } from '../shared/utils/link-utils.js';
 import { getDomRefs } from './dom.js';
-import { loadAppData, saveAppData, saveVideoSettings as persistVideoSettings } from './storage.js';
+import { loadAppData, saveAppData } from './storage.js';
 import { bindContextMenu } from './context-menu.js';
 import {
   setSyncStatus as updateSyncStatus,
@@ -12,12 +11,6 @@ import {
   loadSavedGistCredentials,
   buildExportData
 } from './gist-sync.js';
-import {
-  setVideoSettingsStatus as updateVideoSettingsStatus,
-  renderVideoSettings as renderVideoSettingsUI,
-  bindVideoSettingsControls as bindVideoSettingsUI,
-  handleVideoStorageChange
-} from './video-settings.js';
 
 (() => {
   'use strict';
@@ -57,49 +50,26 @@ import {
     settingsGroupList,
     settingsAddGroup,
     settingsClose,
-    videoSettingsStatus,
-    videoSettingInputs,
-    videoSettingToggles,
     gistTokenInput,
     gistIdInput,
     syncPush,
     syncPull,
     syncStatus
   } = dom;
-  let videoSettings = { ...VIDEO_DEFAULT_SETTINGS };
 
   /* ========== STORAGE HELPERS ========== */
   function loadData() {
-    const state = { links, groups, settings, videoSettings, selectedGroup };
+    const state = { links, groups, settings, selectedGroup };
     return loadAppData(state).then(() => {
       links = state.links;
       groups = state.groups;
       settings = state.settings;
-      videoSettings = state.videoSettings;
       selectedGroup = state.selectedGroup;
     });
   }
 
   function saveData() {
     saveAppData({ links, groups, settings });
-  }
-
-  function setVideoSettingsStatus(message, type = '') {
-    updateVideoSettingsStatus(dom, message, type);
-  }
-
-  function renderVideoSettings() {
-    renderVideoSettingsUI(dom, { videoSettings });
-  }
-
-  function saveVideoSettings() {
-    persistVideoSettings({ videoSettings }, () => {
-      setVideoSettingsStatus('Đã lưu cài đặt Floating Video Player.', 'ok');
-    });
-  }
-
-  function bindVideoSettingsControls() {
-    bindVideoSettingsUI(dom, { videoSettings }, saveVideoSettings);
   }
 
   /* ========== CSS VARS ========== */
@@ -579,7 +549,6 @@ import {
     settingIconSize.value = settings.iconSize;
     settingIconSizeVal.textContent = settings.iconSize + 'px';
     renderGroupList();
-    renderVideoSettings();
     loadSavedGistCredentials(dom);
   }
 
@@ -783,7 +752,6 @@ import {
       settingIconSize.value = settings.iconSize;
       settingIconSizeVal.textContent = settings.iconSize + 'px';
       renderGroupList();
-      renderVideoSettings();
 
       setSyncStatus('✓ Kéo về thành công · ' + new Date().toLocaleTimeString(), 'ok');
     } catch (err) {
@@ -825,20 +793,12 @@ import {
       links = changes.links.newValue || [];
       render();
     }
-
-    if (area === 'local' && changes[STORAGE_KEYS.videoSettings]) {
-      handleVideoStorageChange({ videoSettings }, changes);
-      videoSettings = Object.assign({}, VIDEO_DEFAULT_SETTINGS, changes[STORAGE_KEYS.videoSettings].newValue || {});
-      renderVideoSettings();
-    }
   });
 
   /* ========== INIT ========== */
   bindGistCredentialInputs(dom);
-  bindVideoSettingsControls();
   loadData().then(() => {
     render();
-    renderVideoSettings();
   });
 
 })();

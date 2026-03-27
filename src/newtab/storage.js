@@ -1,6 +1,5 @@
 import { DEFAULT_GROUPS, DEFAULT_LINKS, DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
-import { VIDEO_DEFAULT_SETTINGS } from '../shared/constants/video-settings.js';
 import { deepClone } from '../shared/utils/clone.js';
 
 export function loadAppData(state) {
@@ -8,8 +7,7 @@ export function loadAppData(state) {
         chrome.storage.local.get([
             STORAGE_KEYS.links,
             STORAGE_KEYS.groups,
-            STORAGE_KEYS.settings,
-            STORAGE_KEYS.videoSettings
+            STORAGE_KEYS.settings
         ], result => {
             if (result[STORAGE_KEYS.links] && result[STORAGE_KEYS.links].length > 0) {
                 state.links = result[STORAGE_KEYS.links];
@@ -23,7 +21,6 @@ export function loadAppData(state) {
             }
 
             state.settings = Object.assign({}, DEFAULT_SETTINGS, result[STORAGE_KEYS.settings] || {});
-            state.videoSettings = Object.assign({}, VIDEO_DEFAULT_SETTINGS, result[STORAGE_KEYS.videoSettings] || {});
             state.selectedGroup = state.groups.selected || state.groups.list.find(g => !state.groups.pinned.includes(g)) || state.groups.list[0];
             resolve();
         });
@@ -36,10 +33,4 @@ export function saveAppData(state) {
         [STORAGE_KEYS.groups]: state.groups,
         [STORAGE_KEYS.settings]: state.settings
     });
-}
-
-export function saveVideoSettings(state, onSaved) {
-    chrome.storage.local.set({
-        [STORAGE_KEYS.videoSettings]: state.videoSettings
-    }, onSaved);
 }

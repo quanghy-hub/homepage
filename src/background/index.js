@@ -62,7 +62,10 @@ function getTargetGroup(groups) {
 }
 
 function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
+  console.log('[Homepage] addUrlToHomepage called:', { url, title, tabId });
+
   if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
+    console.warn('[Homepage] URL rejected:', url);
     safeBadge(tabId, '✗', '#f85149');
     clearBadgeLater(tabId);
     callback({ ok: false, reason: 'invalid-url' });
@@ -70,12 +73,15 @@ function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
   }
 
   chrome.storage.local.get(['links', 'groups'], result => {
+    console.log('[Homepage] storage.get result:', { linksCount: result.links?.length, hasGroups: !!result.groups });
     const links = result.links || [];
     const groups = result.groups || JSON.parse(JSON.stringify(BG_DEFAULT_GROUPS));
     const targetGroup = getTargetGroup(groups);
+    console.log('[Homepage] targetGroup:', targetGroup);
 
     const isDuplicate = links.some(l => l.url === url && l.parent === targetGroup);
     if (isDuplicate) {
+      console.warn('[Homepage] Duplicate URL:', url, 'in group:', targetGroup);
       safeBadge(tabId, '✗', '#f85149');
       clearBadgeLater(tabId);
       callback({ ok: false, reason: 'duplicate', group: targetGroup });
@@ -91,14 +97,17 @@ function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
       url
     });
 
+    console.log('[Homepage] Saving', links.length, 'links...');
     chrome.storage.local.set({ links }, () => {
       if (chrome.runtime.lastError) {
+        console.error('[Homepage] Storage error:', chrome.runtime.lastError.message);
         safeBadge(tabId, '✗', '#f85149');
         clearBadgeLater(tabId);
         callback({ ok: false, reason: 'storage-error' });
         return;
       }
 
+      console.log('[Homepage] ✓ Link saved successfully to group:', targetGroup);
       safeBadge(tabId, '✓', '#3fb950');
       clearBadgeLater(tabId);
       callback({ ok: true, group: targetGroup });
@@ -107,19 +116,53 @@ function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
 }
 
 // Handle click
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== HOMEPAGE_MENU_ID && info.menuItemId !== HOMEPAGE_LINK_MENU_ID) return;
 
   const isLinkMenu = info.menuItemId === HOMEPAGE_LINK_MENU_ID;
-  const url = isLinkMenu ? info.linkUrl : (info.pageUrl || tab?.url);
-  const title = isLinkMenu
-    ? (info.selectionText?.trim() || info.linkText?.trim() || tab?.title || extractTitle(url))
-    : (tab?.title || extractTitle(url));
+  let url, title;
+  const tabId = tab?.id;
 
-  addUrlToHomepage({
-    url,
-    title,
-    tabId: tab?.id
+  if (isLinkMenu) {
+    url = info.linkUrl;
+    title = info.selectionText?.trim() || info.linkText?.trim() || tab?.title || '';
+  } else {
+    // Lấy URL trang: thử nhiều nguồn (Kiwi Android có thể thiếu info.pageUrl hoặc tab.url)
+    url = info.pageUrl || tab?.url;
+    title = tab?.title || '';
+
+    // Fallback 1: chrome.tabs.get
+    if (!url && typeof tabId === 'number') {
+      try {
+        const freshTab = await chrome.tabs.get(tabId);
+        url = freshTab?.url;
+        title = title || freshTab?.title || '';
+      } catch (_) { /* ignore */ }
+    }
+
+    // Fallback 2: query active tab
+    if (!url) {
+      try {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        url = activeTab?.url;
+        title = title || activeTab?.title || '';
+      } catch (_) { /* ignore */ }
+    }
+  }
+
+  console.log('[Homepage] contextMenu clicked:', { menuItemId: info.menuItemId, url, title, pageUrl: info.pageUrl, tabUrl: tab?.url, tabId });
+
+  if (!url) {
+    console.warn('[Homepage] Không lấy được URL');
+    safeBadge(tabId, '✗', '#f85149');
+    clearBadgeLater(tabId);
+    return;
+  }
+
+  title = title || extractTitle(url);
+
+  addUrlToHomepage({ url, title, tabId }, result => {
+    console.log('[Homepage] addUrlToHomepage result:', result);
   });
 });
 

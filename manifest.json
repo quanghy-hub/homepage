@@ -13,44 +13,6 @@
     "activeTab",
     "tabs"
   ],
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "css": [
-        "src/content/cookie-bypass/styles.css"
-      ],
-      "js": [
-        "src/content/cookie-bypass/index.js"
-      ],
-      "run_at": "document_end"
-    },
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "css": [
-        "src/content/video-floating/styles.css"
-      ],
-      "js": [
-        "src/content/video-floating/index.js"
-      ],
-      "run_at": "document_end",
-      "all_frames": true
-    },
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "src/content/video-floating/page-api.js"
-      ],
-      "run_at": "document_end",
-      "all_frames": true,
-      "world": "MAIN"
-    }
-  ],
   "background": {
     "service_worker": "src/background/index.js"
   },
