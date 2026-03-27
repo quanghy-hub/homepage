@@ -217,13 +217,13 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 
   if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
-    chrome.tabs.create({ url: 'src/newtab/index.html' });
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/newtab/index.html') });
     return;
   }
 
   addUrlToHomepage({ url, title, tabId }, result => {
     if (!result?.ok) {
-      chrome.tabs.create({ url: 'src/newtab/index.html' });
+      chrome.tabs.create({ url: chrome.runtime.getURL('src/newtab/index.html') });
     }
   });
 });
