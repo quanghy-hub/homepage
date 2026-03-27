@@ -205,7 +205,7 @@ function extractTitle(url, fallbackTitle) {
 // ========== ACTION: Click vào icon Extension ==========
 // Android/Kiwi thường không có context menu extension ổn định,
 // nên click icon sẽ cố thêm tab hiện tại vào Homepage trước.
-// Nếu trang hiện tại không thêm được thì fallback mở Homepage/new tab.
+// Không tự mở tab mới ở đây để tránh vòng lặp/crash trên mobile browsers.
 chrome.action.onClicked.addListener(async (tab) => {
   let url = tab?.url;
   let title = tab?.title;
@@ -231,13 +231,10 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 
   if (!url || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
-    chrome.tabs.create({ url: chrome.runtime.getURL('src/newtab/index.html') });
+    safeBadge(tabId, '✗', '#f85149');
+    clearBadgeLater(tabId);
     return;
   }
 
-  addUrlToHomepage({ url, title, tabId }, result => {
-    if (!result?.ok) {
-      chrome.tabs.create({ url: chrome.runtime.getURL('src/newtab/index.html') });
-    }
-  });
+  addUrlToHomepage({ url, title, tabId }, () => {});
 });
