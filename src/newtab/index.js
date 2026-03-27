@@ -29,6 +29,9 @@ import {
   /* ========== DOM REFS ========== */
   const dom = getDomRefs();
   const {
+    addCurrentBtn,
+    pasteUrlBtn,
+    quickActionStatus,
     pinnedGrid,
     groupTabs,
     selectedGrid,
@@ -87,23 +90,22 @@ import {
       .sort((a, b) => a.order - b.order);
   }
 
-  function insertLinkAtTop(groupName, linkData) {
-    links = links.map(existing =>
-      existing.parent === groupName
-        ? { ...existing, order: (Number.isFinite(existing.order) ? existing.order : 0) + 1 }
-        : existing
-    );
+  function setQuickActionStatus(message, type = '') {
+    if (!quickActionStatus) return;
+    quickActionStatus.textContent = message;
+    quickActionStatus.className = 'quick-action-status' + (type ? ` ${type}` : '');
+  }
 
-    const newId = 'links' + Math.random().toString(36).slice(2, 10);
-    links.push({
-      _id: newId,
-      order: 0,
-      parent: groupName,
-      title: linkData.title,
-      url: linkData.url
-    });
+  function fillAddLinkModal(url = '', title = '', group = selectedGroup) {
+    openModal('add-link', null, group);
+    inputUrl.value = url;
+    inputName.value = title || (url ? autoTitle(url) : '');
+    inputGroup.value = group;
+    inputUrl.focus();
+  }
 
-    return newId;
+  function isNormalUrl(url) {
+    return !!url && !url.startsWith('chrome://') && !url.startsWith('chrome-extension://');
   }
 
   function createLinkEl(link) {
@@ -532,7 +534,15 @@ import {
         link.parent = group;
       }
     } else {
-      insertLinkAtTop(group, { title, url });
+      const groupLinks = getLinksForGroup(group);
+      const newId = 'links' + Math.random().toString(36).slice(2, 10);
+      links.push({
+        _id: newId,
+        order: groupLinks.length,
+        parent: group,
+        title,
+        url
+      });
     }
 
     saveData();
@@ -549,6 +559,37 @@ import {
   inputUrl.addEventListener('blur', () => {
     if (inputUrl.value && !inputName.value) {
       inputName.value = autoTitle(inputUrl.value);
+    }
+  });
+
+  addCurrentBtn.addEventListener('click', () => {
+    chrome.storage.local.get([STORAGE_KEYS.recentPage], result => {
+      const recent = result[STORAGE_KEYS.recentPage];
+      if (!recent || !isNormalUrl(recent.url)) {
+        setQuickActionStatus('Chưa có trang gần nhất để thêm. Hãy mở web rồi quay lại.', 'err');
+        fillAddLinkModal('', '', selectedGroup);
+        return;
+      }
+
+      setQuickActionStatus(`Đã lấy: ${recent.title || recent.url}`, 'ok');
+      fillAddLinkModal(recent.url, recent.title || autoTitle(recent.url), selectedGroup);
+    });
+  });
+
+  pasteUrlBtn.addEventListener('click', async () => {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (!isNormalUrl(text)) {
+        setQuickActionStatus('Clipboard không có URL hợp lệ. Hãy dán thủ công.', 'err');
+        fillAddLinkModal('', '', selectedGroup);
+        return;
+      }
+
+      setQuickActionStatus('Đã dán URL từ clipboard.', 'ok');
+      fillAddLinkModal(text, autoTitle(text), selectedGroup);
+    } catch (_) {
+      setQuickActionStatus('Trình duyệt không cho đọc clipboard. Hãy dán thủ công.', 'err');
+      fillAddLinkModal('', '', selectedGroup);
     }
   });
 
@@ -800,30 +841,8 @@ import {
 
   /* ========== AUTO-REFRESH ON EXTERNAL CHANGES ========== */
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-
-    let shouldRender = false;
-
-    if (changes.links) {
+    if (area === 'local' && changes.links) {
       links = changes.links.newValue || [];
-      shouldRender = true;
-    }
-
-    if (changes.groups) {
-      groups = changes.groups.newValue || groups;
-      if (typeof groups.pinned === 'string') {
-        groups.pinned = [groups.pinned];
-      }
-      selectedGroup = groups.selected || groups.list.find(g => !groups.pinned.includes(g)) || groups.list[0];
-      shouldRender = true;
-    }
-
-    if (changes.settings) {
-      settings = Object.assign({}, DEFAULT_SETTINGS, changes.settings.newValue || {});
-      shouldRender = true;
-    }
-
-    if (shouldRender) {
       render();
     }
   });

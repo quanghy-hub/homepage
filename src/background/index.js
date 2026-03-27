@@ -2,6 +2,7 @@
 
 const HOMEPAGE_MENU_ID = 'add-to-homepage';
 const HOMEPAGE_LINK_MENU_ID = 'add-link-to-homepage';
+const RECENT_PAGE_KEY = 'recentPage';
 
 function safeBadge(tabId, text, color) {
   if (typeof tabId !== 'number') return;
@@ -61,22 +62,20 @@ function getTargetGroup(groups) {
   return BG_DEFAULT_GROUPS.pinned[0];
 }
 
-function insertLinkAtTop(links, targetGroup, link) {
-  const nextLinks = links.map(existing =>
-    existing.parent === targetGroup
-      ? { ...existing, order: (Number.isFinite(existing.order) ? existing.order : 0) + 1 }
-      : existing
-  );
+function isTrackableUrl(url) {
+  return !!url && !url.startsWith('chrome://') && !url.startsWith('chrome-extension://');
+}
 
-  nextLinks.push({
-    _id: 'links' + Math.random().toString(36).slice(2, 10),
-    order: 0,
-    parent: targetGroup,
-    title: link.title,
-    url: link.url
-  });
+function rememberRecentPage(tab) {
+  if (!tab || !isTrackableUrl(tab.url)) return;
 
-  return nextLinks;
+  chrome.storage.local.set({
+    [RECENT_PAGE_KEY]: {
+      url: tab.url,
+      title: tab.title || extractTitle(tab.url),
+      updatedAt: Date.now()
+    }
+  }, () => void chrome.runtime.lastError);
 }
 
 function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
@@ -106,13 +105,17 @@ function addUrlToHomepage({ url, title, tabId }, callback = () => {}) {
       return;
     }
 
-    const nextLinks = insertLinkAtTop(links, targetGroup, {
+    const groupLinks = links.filter(l => l.parent === targetGroup);
+    links.push({
+      _id: 'links' + Math.random().toString(36).slice(2, 10),
+      order: groupLinks.length,
+      parent: targetGroup,
       title: extractTitle(url, title),
       url
     });
 
-    console.log('[Homepage] Saving', nextLinks.length, 'links...');
-    chrome.storage.local.set({ links: nextLinks, groups }, () => {
+    console.log('[Homepage] Saving', links.length, 'links...');
+    chrome.storage.local.set({ links }, () => {
       if (chrome.runtime.lastError) {
         console.error('[Homepage] Storage error:', chrome.runtime.lastError.message);
         safeBadge(tabId, '✗', '#f85149');
@@ -180,6 +183,19 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   });
 });
 
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    rememberRecentPage(tab);
+  } catch (_) { /* ignore */ }
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' || changeInfo.url) {
+    rememberRecentPage(tab);
+  }
+});
+
 // Extract a clean title from URL
 function extractTitle(url, fallbackTitle) {
   if (fallbackTitle && fallbackTitle.length > 0 && fallbackTitle.length < 30) {
@@ -205,7 +221,7 @@ function extractTitle(url, fallbackTitle) {
 // ========== ACTION: Click vào icon Extension ==========
 // Android/Kiwi thường không có context menu extension ổn định,
 // nên click icon sẽ cố thêm tab hiện tại vào Homepage trước.
-// Không tự mở tab mới ở đây để tránh vòng lặp/crash trên mobile browsers.
+// Nếu không lấy được URL hợp lệ thì chỉ báo lỗi, không tự mở tab mới để tránh crash loop.
 chrome.action.onClicked.addListener(async (tab) => {
   let url = tab?.url;
   let title = tab?.title;

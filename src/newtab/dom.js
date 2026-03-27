@@ -1,5 +1,9 @@
 export function getDomRefs() {
     return {
+        quickActions: document.getElementById('quick-actions'),
+        addCurrentBtn: document.getElementById('add-current-btn'),
+        pasteUrlBtn: document.getElementById('paste-url-btn'),
+        quickActionStatus: document.getElementById('quick-action-status'),
         pinnedGrid: document.getElementById('pinned-grid'),
         groupTabs: document.getElementById('group-tabs'),
         selectedGrid: document.getElementById('selected-grid'),

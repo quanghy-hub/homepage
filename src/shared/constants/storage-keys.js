@@ -3,5 +3,6 @@ export const STORAGE_KEYS = {
     groups: 'groups',
     settings: 'settings',
     gistToken: 'gistToken',
-    gistId: 'gistId'
+    gistId: 'gistId',
+    recentPage: 'recentPage'
 };
