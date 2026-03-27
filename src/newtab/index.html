@@ -11,14 +11,12 @@
 
 <body>
   <div id="main-container">
-    <div id="quick-actions" class="quick-actions">
-      <button id="add-current-btn" class="quick-action-btn">+ Thêm link hiện tại</button>
-      <button id="paste-url-btn" class="quick-action-btn quick-action-btn-secondary">Dán URL</button>
-      <div id="quick-action-status" class="quick-action-status"></div>
-    </div>
-
     <!-- Pinned Group Icons -->
     <div class="links-grid" id="pinned-grid"></div>
+    <div id="quick-actions" class="quick-actions">
+      <button id="add-current-btn" class="quick-action-btn">+</button>
+      <div id="quick-action-status" class="quick-action-status"></div>
+    </div>
 
     <!-- Selected Group Icons -->
     <div class="links-grid" id="selected-grid"></div>
@@ -41,6 +39,8 @@
   <div id="context-menu" class="context-menu hidden">
     <button data-action="add-link">➕ Thêm link</button>
     <button data-action="add-group">📁 Thêm nhóm</button>
+    <button data-action="pin-group" class="ctx-group-only hidden">📌 Ghim nhóm</button>
+    <button data-action="delete-group" class="ctx-group-only hidden">🗑️ Xoá nhóm</button>
     <div class="ctx-sep"></div>
     <button data-action="edit" class="ctx-link-only">✏️ Sửa</button>
     <button data-action="delete" class="ctx-link-only">🗑️ Xoá</button>
@@ -83,12 +83,6 @@
         <span id="setting-icon-size-val">56px</span>
       </label>
 
-
-      <div class="settings-section">
-        <h4>Quản lý nhóm</h4>
-        <div id="settings-group-list"></div>
-        <button id="settings-add-group" class="btn-flat">+ Thêm nhóm</button>
-      </div>
       <div class="settings-section">
         <h4>Đồng bộ GitHub Gist</h4>
         <label>GitHub Token

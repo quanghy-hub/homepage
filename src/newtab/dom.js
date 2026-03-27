@@ -2,7 +2,6 @@ export function getDomRefs() {
     return {
         quickActions: document.getElementById('quick-actions'),
         addCurrentBtn: document.getElementById('add-current-btn'),
-        pasteUrlBtn: document.getElementById('paste-url-btn'),
         quickActionStatus: document.getElementById('quick-action-status'),
         pinnedGrid: document.getElementById('pinned-grid'),
         groupTabs: document.getElementById('group-tabs'),
@@ -22,8 +21,6 @@ export function getDomRefs() {
         settingsOverlay: document.getElementById('settings-overlay'),
         settingIconSize: document.getElementById('setting-icon-size'),
         settingIconSizeVal: document.getElementById('setting-icon-size-val'),
-        settingsGroupList: document.getElementById('settings-group-list'),
-        settingsAddGroup: document.getElementById('settings-add-group'),
         settingsClose: document.getElementById('settings-close'),
         gistTokenInput: document.getElementById('setting-gist-token'),
         gistIdInput: document.getElementById('setting-gist-id'),

@@ -6,23 +6,39 @@ export function bindContextMenu(deps) {
         getGroups,
         showContextMenu,
         hideContextMenu,
+        setContextMenuMode,
         setContextLinkId,
         getContextLinkId,
         setLinks,
         getLinks,
         saveData,
         render,
-        openModal
+        openModal,
+        togglePinGroup,
+        deleteGroup
     } = deps;
 
     let touchTimer = null;
     let touchMoved = false;
     let lastTouchTarget = null;
+    let openedFromTouch = false;
+    const addLinkButton = contextMenu.querySelector('[data-action="add-link"]');
+    const pinGroupButton = contextMenu.querySelector('[data-action="pin-group"]');
+    const deleteGroupButton = contextMenu.querySelector('[data-action="delete-group"]');
 
     function getPoint(event) {
         if (event.touches && event.touches[0]) return event.touches[0];
         if (event.changedTouches && event.changedTouches[0]) return event.changedTouches[0];
         return event;
+    }
+
+    function updateMenuForInputMode() {
+        if (!addLinkButton) return;
+        if (openedFromTouch) {
+            addLinkButton.classList.add('hidden');
+        } else {
+            addLinkButton.classList.remove('hidden');
+        }
     }
 
     function resolveGroupFromTarget(target) {
@@ -43,8 +59,21 @@ export function bindContextMenu(deps) {
     }
 
     documentRef.addEventListener('contextmenu', e => {
+        const groupTarget = e.target.closest('.group-context-target');
+        if (groupTarget && !e.target.closest('.context-menu') && !e.target.closest('.modal') && !e.target.closest('.settings-modal')) {
+            e.preventDefault();
+            openedFromTouch = false;
+            updateMenuForInputMode();
+            setContextMenuMode('group');
+            showContextMenu(e.pageX, e.pageY, null, groupTarget.dataset.groupName);
+            return;
+        }
+
         if (!e.target.closest('.link-item') && !e.target.closest('.context-menu') && !e.target.closest('.modal') && !e.target.closest('.settings-modal')) {
             e.preventDefault();
+            openedFromTouch = false;
+            updateMenuForInputMode();
+            setContextMenuMode('general');
             showContextMenu(e.pageX, e.pageY, null, resolveGroupFromTarget(e.target));
         }
     });
@@ -68,6 +97,15 @@ export function bindContextMenu(deps) {
                 return;
             }
             touchTimer = null;
+            openedFromTouch = true;
+            updateMenuForInputMode();
+            const groupTarget = currentTarget.closest('.group-context-target');
+            if (groupTarget) {
+                setContextMenuMode('group');
+                showContextMenu(startX, startY, null, groupTarget.dataset.groupName);
+                return;
+            }
+            setContextMenuMode('general');
             showContextMenu(startX, startY, null, resolveGroupFromTarget(currentTarget));
         }, 450);
     }, { passive: true });
@@ -92,7 +130,7 @@ export function bindContextMenu(deps) {
         if (!contextMenu.contains(e.target)) hideContextMenu();
     });
 
-    contextMenu.querySelector('[data-action="add-link"]').addEventListener('click', () => {
+    addLinkButton.addEventListener('click', () => {
         hideContextMenu();
         openModal('add-link', null, getSelectedGroup());
     });
@@ -100,6 +138,18 @@ export function bindContextMenu(deps) {
     contextMenu.querySelector('[data-action="add-group"]').addEventListener('click', () => {
         hideContextMenu();
         openModal('add-group');
+    });
+
+    pinGroupButton.addEventListener('click', () => {
+        const group = getSelectedGroup();
+        hideContextMenu();
+        if (group) togglePinGroup(group);
+    });
+
+    deleteGroupButton.addEventListener('click', () => {
+        const group = getSelectedGroup();
+        hideContextMenu();
+        if (group) deleteGroup(group);
     });
 
     contextMenu.querySelector('[data-action="edit"]').addEventListener('click', () => {

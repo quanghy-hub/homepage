@@ -24,13 +24,13 @@ import {
   let editingGroupName = null; // group name being renamed
   let contextLinkId = null; // link right-clicked on (null if clicked on empty area)
   let contextGroup = null;  // which group area was right-clicked
+  let contextMenuMode = 'general';
   let modalMode = null; // 'add-link', 'edit-link', 'add-group'
 
   /* ========== DOM REFS ========== */
   const dom = getDomRefs();
   const {
     addCurrentBtn,
-    pasteUrlBtn,
     quickActionStatus,
     pinnedGrid,
     groupTabs,
@@ -50,8 +50,6 @@ import {
     settingsOverlay,
     settingIconSize,
     settingIconSizeVal,
-    settingsGroupList,
-    settingsAddGroup,
     settingsClose,
     gistTokenInput,
     gistIdInput,
@@ -340,6 +338,8 @@ import {
       const header = document.createElement('div');
       header.className = 'pinned-group-header';
       header.textContent = groupName;
+      header.dataset.groupName = groupName;
+      header.classList.add('group-context-target');
 
       // Drop zone for empty grid or general grid area
       grid.addEventListener('dragover', e => {
@@ -360,7 +360,16 @@ import {
       });
 
       pinnedGrid.appendChild(grid);
-      pinnedGrid.appendChild(header);
+
+      if (groupName === groups.pinned[0]) {
+        const firstPinnedRow = document.createElement('div');
+        firstPinnedRow.className = 'pinned-group-row';
+        firstPinnedRow.appendChild(header);
+        firstPinnedRow.appendChild(dom.quickActions);
+        pinnedGrid.appendChild(firstPinnedRow);
+      } else {
+        pinnedGrid.appendChild(header);
+      }
     });
 
     // Group tabs (below icons)
@@ -369,6 +378,8 @@ import {
       const tab = document.createElement('button');
       tab.className = 'tab' + (g === selectedGroup ? ' active' : '');
       tab.textContent = g;
+      tab.dataset.groupName = g;
+      tab.classList.add('group-context-target');
       tab.addEventListener('click', () => {
         selectedGroup = g;
         groups.selected = g;
@@ -393,13 +404,35 @@ import {
     contextMenu.classList.remove('hidden');
 
     // Show/hide link-specific items
+    const addLinkBtn = contextMenu.querySelector('[data-action="add-link"]');
+    const addGroupBtn = contextMenu.querySelector('[data-action="add-group"]');
     const linkOnlyBtns = contextMenu.querySelectorAll('.ctx-link-only');
+    const groupOnlyBtns = contextMenu.querySelectorAll('.ctx-group-only');
+    const pinGroupBtn = contextMenu.querySelector('[data-action="pin-group"]');
+    const deleteGroupBtn = contextMenu.querySelector('[data-action="delete-group"]');
     const sep = contextMenu.querySelector('.ctx-sep');
-    if (linkId) {
+    if (contextMenuMode === 'group') {
+      linkOnlyBtns.forEach(b => b.classList.add('hidden'));
+      groupOnlyBtns.forEach(b => b.classList.remove('hidden'));
+      if (addLinkBtn) addLinkBtn.classList.add('hidden');
+      if (addGroupBtn) addGroupBtn.classList.remove('hidden');
+      if (pinGroupBtn) {
+        pinGroupBtn.textContent = groups.pinned.includes(contextGroup) ? '📍 Bỏ ghim nhóm' : '📌 Ghim nhóm';
+      }
+      if (deleteGroupBtn && groups.list.length <= 2) {
+        deleteGroupBtn.classList.add('hidden');
+      }
+      if (sep) sep.classList.add('hidden');
+    } else if (linkId) {
       linkOnlyBtns.forEach(b => b.classList.remove('hidden'));
+      groupOnlyBtns.forEach(b => b.classList.add('hidden'));
+      if (addLinkBtn) addLinkBtn.classList.remove('hidden');
+      if (addGroupBtn) addGroupBtn.classList.remove('hidden');
       if (sep) sep.classList.remove('hidden');
     } else {
       linkOnlyBtns.forEach(b => b.classList.add('hidden'));
+      groupOnlyBtns.forEach(b => b.classList.add('hidden'));
+      if (addGroupBtn) addGroupBtn.classList.remove('hidden');
       if (sep) sep.classList.add('hidden');
     }
 
@@ -411,6 +444,44 @@ import {
     contextMenu.classList.add('hidden');
     contextLinkId = null;
     contextGroup = null;
+    contextMenuMode = 'general';
+  }
+
+  function togglePinGroup(groupName) {
+    if (!groupName) return;
+
+    if (groups.pinned.includes(groupName)) {
+      groups.pinned = groups.pinned.filter(p => p !== groupName);
+      if (selectedGroup === groupName || !selectedGroup) {
+        selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
+      }
+    } else {
+      groups.pinned.push(groupName);
+      if (selectedGroup === groupName) {
+        selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
+      }
+    }
+
+    groups.selected = selectedGroup;
+    saveData();
+    render();
+  }
+
+  function deleteGroup(groupName) {
+    if (!groupName || groups.list.length <= 2) return;
+    if (!confirm(`Xoá nhóm "${groupName}"? Các link trong nhóm cũng sẽ bị xoá.`)) return;
+
+    groups.list = groups.list.filter(x => x !== groupName);
+    groups.pinned = groups.pinned.filter(x => x !== groupName);
+    links = links.filter(l => l.parent !== groupName);
+
+    if (selectedGroup === groupName) {
+      selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
+    }
+
+    groups.selected = selectedGroup;
+    saveData();
+    render();
   }
 
   bindContextMenu({
@@ -420,13 +491,16 @@ import {
     getGroups: () => groups,
     showContextMenu,
     hideContextMenu,
+    setContextMenuMode: value => { contextMenuMode = value; },
     setContextLinkId: value => { contextLinkId = value; },
     getContextLinkId: () => contextLinkId,
     setLinks: value => { links = value; },
     getLinks: () => links,
     saveData,
     render,
-    openModal
+    openModal,
+    togglePinGroup,
+    deleteGroup
   });
 
   /* ========== MODAL ========== */
@@ -576,23 +650,6 @@ import {
     });
   });
 
-  pasteUrlBtn.addEventListener('click', async () => {
-    try {
-      const text = (await navigator.clipboard.readText()).trim();
-      if (!isNormalUrl(text)) {
-        setQuickActionStatus('Clipboard không có URL hợp lệ. Hãy dán thủ công.', 'err');
-        fillAddLinkModal('', '', selectedGroup);
-        return;
-      }
-
-      setQuickActionStatus('Đã dán URL từ clipboard.', 'ok');
-      fillAddLinkModal(text, autoTitle(text), selectedGroup);
-    } catch (_) {
-      setQuickActionStatus('Trình duyệt không cho đọc clipboard. Hãy dán thủ công.', 'err');
-      fillAddLinkModal('', '', selectedGroup);
-    }
-  });
-
   /* ========== SETTINGS PANEL ========== */
   settingsBtn.addEventListener('click', openSettings);
 
@@ -600,7 +657,6 @@ import {
     settingsOverlay.classList.remove('hidden');
     settingIconSize.value = settings.iconSize;
     settingIconSizeVal.textContent = settings.iconSize + 'px';
-    renderGroupList();
     loadSavedGistCredentials(dom);
   }
 
@@ -619,87 +675,6 @@ import {
     settings.iconSize = val;
     saveData();
     applySettings();
-  });
-
-  function renderGroupList() {
-    settingsGroupList.innerHTML = '';
-    groups.list.forEach(g => {
-      const item = document.createElement('div');
-      item.className = 'settings-group-item';
-
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'group-name';
-      nameSpan.textContent = g;
-      item.appendChild(nameSpan);
-
-      // Pin toggle button
-      const pinBtn = document.createElement('button');
-      const isPinned = groups.pinned.includes(g);
-      pinBtn.className = 'btn-pin-group' + (isPinned ? ' active' : '');
-      pinBtn.innerHTML = isPinned ? '📌' : '📍';
-      pinBtn.title = isPinned ? 'Bỏ ghim' : 'Ghim nhóm này';
-      pinBtn.addEventListener('click', () => {
-        if (isPinned) {
-          // Unpin (only if at least 1 pinned remaining or we allow 0)
-          groups.pinned = groups.pinned.filter(p => p !== g);
-          if (selectedGroup === g || !selectedGroup) {
-            selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
-          }
-        } else {
-          // Pin
-          if (!groups.pinned.includes(g)) {
-            groups.pinned.push(g);
-          }
-          if (selectedGroup === g) {
-            selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
-          }
-        }
-        groups.selected = selectedGroup;
-        saveData();
-        render();
-        renderGroupList();
-      });
-      item.appendChild(pinBtn);
-
-      // Rename button
-      const renBtn = document.createElement('button');
-      renBtn.className = 'btn-ren-group';
-      renBtn.innerHTML = '✏️';
-      renBtn.title = 'Đổi tên nhóm';
-      renBtn.addEventListener('click', () => {
-        closeSettings();
-        openModal('edit-group', g);
-      });
-      item.appendChild(renBtn);
-
-      // Delete button (can't delete pinned or if only 2 groups left)
-      if (!groups.pinned.includes(g) && groups.list.length > 2) {
-        const delBtn = document.createElement('button');
-        delBtn.className = 'btn-del-group';
-        delBtn.textContent = '✕';
-        delBtn.title = 'Xoá nhóm';
-        delBtn.addEventListener('click', () => {
-          if (!confirm(`Xoá nhóm "${g}"? Các link trong nhóm cũng sẽ bị xoá.`)) return;
-          groups.list = groups.list.filter(x => x !== g);
-          links = links.filter(l => l.parent !== g);
-          if (selectedGroup === g) {
-            selectedGroup = groups.list.find(x => !groups.pinned.includes(x)) || groups.list[0];
-            groups.selected = selectedGroup;
-          }
-          saveData();
-          render();
-          renderGroupList();
-        });
-        item.appendChild(delBtn);
-      }
-
-      settingsGroupList.appendChild(item);
-    });
-  }
-
-  settingsAddGroup.addEventListener('click', () => {
-    closeSettings();
-    openModal('add-group');
   });
 
   /* ========== GIST SYNC ========== */
@@ -803,7 +778,6 @@ import {
       // Update settings UI
       settingIconSize.value = settings.iconSize;
       settingIconSizeVal.textContent = settings.iconSize + 'px';
-      renderGroupList();
 
       setSyncStatus('✓ Kéo về thành công · ' + new Date().toLocaleTimeString(), 'ok');
     } catch (err) {
