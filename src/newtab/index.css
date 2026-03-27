@@ -57,7 +57,7 @@ body {
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
-  transform: translateY(1px);
+  transform: translateY(3px);
 }
 
 .quick-action-btn:hover {
@@ -555,102 +555,6 @@ body {
 
 .settings-note.err {
   color: #f85149;
-}
-
-#settings-group-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.settings-group-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 13px;
-  color: #c9d1d9;
-}
-
-.settings-group-item .group-name {
-  flex: 1;
-}
-
-.settings-group-item .group-pinned {
-  font-size: 10px;
-  color: #388bfd;
-  margin-left: 8px;
-}
-
-.settings-group-item .btn-del-group {
-  background: none;
-  border: none;
-  color: #555d68;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: color 0.15s;
-}
-
-.settings-group-item .btn-del-group:hover {
-  color: #f85149;
-}
-
-.btn-pin-group {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  margin-left: auto;
-  margin-right: 4px;
-  opacity: 0.5;
-  transition: all 0.2s;
-}
-
-.btn-pin-group:hover,
-.btn-pin-group.active {
-  opacity: 1;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.btn-pin-group.active {
-  color: #388bfd;
-}
-
-.btn-ren-group {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 13px;
-  padding: 4px 6px;
-  border-radius: 4px;
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-
-.btn-ren-group:hover {
-  opacity: 1;
-}
-
-.btn-flat {
-  background: none;
-  border: none;
-  color: #388bfd;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 6px 0;
-  transition: color 0.15s;
-}
-
-.btn-flat:hover {
-  color: #58a6ff;
 }
 
 #setting-icon-size-val {
