@@ -21,9 +21,11 @@ export function getDomRefs() {
         settingsOverlay: document.getElementById('settings-overlay'),
         settingIconSize: document.getElementById('setting-icon-size'),
         settingIconSizeVal: document.getElementById('setting-icon-size-val'),
+        cleanupFaviconsBtn: document.getElementById('cleanup-favicons'),
         settingsClose: document.getElementById('settings-close'),
         gistTokenInput: document.getElementById('setting-gist-token'),
-        gistIdInput: document.getElementById('setting-gist-id'),
+        verifyGistTokenBtn: document.getElementById('verify-gist-token'),
+        gistVerifyStatus: document.getElementById('gist-verify-status'),
         syncPush: document.getElementById('sync-push'),
         syncPull: document.getElementById('sync-pull'),
         syncStatus: document.getElementById('sync-status')

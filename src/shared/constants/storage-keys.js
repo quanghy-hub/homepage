@@ -4,5 +4,6 @@ export const STORAGE_KEYS = {
     settings: 'settings',
     gistToken: 'gistToken',
     gistId: 'gistId',
-    recentPage: 'recentPage'
+    recentPage: 'recentPage',
+    faviconCache: 'faviconCache'
 };

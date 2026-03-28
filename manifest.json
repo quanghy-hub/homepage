@@ -13,6 +13,9 @@
     "activeTab",
     "tabs"
   ],
+  "host_permissions": [
+    "https://www.google.com/*"
+  ],
   "background": {
     "service_worker": "src/background/index.js"
   },

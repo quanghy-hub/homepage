@@ -3,6 +3,12 @@ export function setSyncStatus(dom, msg, type = '') {
     dom.syncStatus.className = 'sync-status' + (type ? ' ' + type : '');
 }
 
+export function setVerifyStatus(dom, msg, type = '') {
+    if (!dom.gistVerifyStatus) return;
+    dom.gistVerifyStatus.textContent = msg;
+    dom.gistVerifyStatus.className = 'sync-status' + (type ? ' ' + type : '');
+}
+
 export function getGistHeaders(dom) {
     const token = dom.gistTokenInput.value.trim();
     if (!token) return null;
@@ -17,16 +23,11 @@ export function bindGistCredentialInputs(dom) {
     dom.gistTokenInput.addEventListener('input', () => {
         chrome.storage.local.set({ gistToken: dom.gistTokenInput.value.trim() });
     });
-
-    dom.gistIdInput.addEventListener('input', () => {
-        chrome.storage.local.set({ gistId: dom.gistIdInput.value.trim() });
-    });
 }
 
 export function loadSavedGistCredentials(dom) {
     chrome.storage.local.get(['gistToken', 'gistId'], result => {
         if (result.gistToken) dom.gistTokenInput.value = result.gistToken;
-        if (result.gistId) dom.gistIdInput.value = result.gistId;
     });
 }
 

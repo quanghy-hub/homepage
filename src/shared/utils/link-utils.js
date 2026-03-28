@@ -1,10 +1,15 @@
-export function getFavicon(url) {
+export function getHostname(url) {
     try {
         const parsed = new URL(url);
-        return `https://www.google.com/s2/favicons?domain=${parsed.hostname}&sz=128`;
+        return parsed.hostname;
     } catch {
         return '';
     }
+}
+
+export function getFavicon(url) {
+    const hostname = getHostname(url);
+    return hostname ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=128` : '';
 }
 
 export function autoTitle(url) {

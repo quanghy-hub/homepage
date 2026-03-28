@@ -9,7 +9,33 @@
   <link rel="stylesheet" href="index.css">
 </head>
 
-<body>
+<body class="app-loading">
+  <div id="loading-shell" class="loading-shell" aria-hidden="true">
+    <div class="shell-grid">
+      <span class="shell-icon"></span>
+      <span class="shell-icon"></span>
+      <span class="shell-icon"></span>
+      <span class="shell-icon"></span>
+      <span class="shell-icon"></span>
+      <span class="shell-icon"></span>
+    </div>
+    <div class="shell-row">
+      <span class="shell-label"></span>
+      <span class="shell-plus"></span>
+    </div>
+    <div class="shell-grid shell-grid-secondary">
+      <span class="shell-icon"></span>
+      <span class="shell-icon"></span>
+      <span class="shell-icon"></span>
+      <span class="shell-icon"></span>
+    </div>
+    <div class="shell-tabs">
+      <span class="shell-tab"></span>
+      <span class="shell-tab"></span>
+      <span class="shell-tab"></span>
+    </div>
+  </div>
+
   <div id="main-container">
     <!-- Pinned Group Icons -->
     <div class="links-grid" id="pinned-grid"></div>
@@ -78,23 +104,31 @@
     <div class="modal settings-modal">
       <h3>Cài đặt</h3>
 
-      <label>Kích thước icon
-        <input type="range" id="setting-icon-size" min="32" max="80" value="56" step="2">
+      <div class="settings-slider-row">
+        <span class="settings-slider-label">icon</span>
         <span id="setting-icon-size-val">56px</span>
-      </label>
+        <input type="range" id="setting-icon-size" min="32" max="80" value="56" step="2">
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-inline-row">
+          <h4>Favicon Cache</h4>
+          <button id="cleanup-favicons" class="icon-action-btn" title="Dọn icon cũ">🗑</button>
+        </div>
+      </div>
 
       <div class="settings-section">
         <h4>Đồng bộ GitHub Gist</h4>
-        <label>GitHub Token
+        <label>GitHub Token</label>
+        <div class="token-row">
           <input type="text" id="setting-gist-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
-        </label>
-        <label>Gist ID (tự tạo nếu bỏ trống)
-          <input type="text" id="setting-gist-id" placeholder="Gist ID" autocomplete="off">
-        </label>
+          <button id="verify-gist-token" class="icon-action-btn" title="Kiểm tra token">✓</button>
+        </div>
         <div class="sync-actions">
           <button id="sync-push" class="btn-sync">⬆ Đẩy lên</button>
           <button id="sync-pull" class="btn-sync">⬇ Kéo về</button>
         </div>
+        <div id="gist-verify-status" class="sync-status"></div>
         <div id="sync-status" class="sync-status"></div>
       </div>
 

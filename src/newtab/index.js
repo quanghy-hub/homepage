@@ -1,11 +1,12 @@
 import { DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
-import { getFavicon, autoTitle } from '../shared/utils/link-utils.js';
+import { getFavicon, getHostname, autoTitle } from '../shared/utils/link-utils.js';
 import { getDomRefs } from './dom.js';
 import { loadAppData, saveAppData } from './storage.js';
 import { bindContextMenu } from './context-menu.js';
 import {
   setSyncStatus as updateSyncStatus,
+  setVerifyStatus as updateVerifyStatus,
   getGistHeaders,
   bindGistCredentialInputs,
   loadSavedGistCredentials,
@@ -20,6 +21,7 @@ import {
   let groups = {};
   let settings = {};
   let selectedGroup = '';
+  let faviconCache = {};
   let editingLinkId = null;
   let editingGroupName = null; // group name being renamed
   let contextLinkId = null; // link right-clicked on (null if clicked on empty area)
@@ -50,13 +52,17 @@ import {
     settingsOverlay,
     settingIconSize,
     settingIconSizeVal,
+    cleanupFaviconsBtn,
     settingsClose,
     gistTokenInput,
-    gistIdInput,
+    verifyGistTokenBtn,
+    gistVerifyStatus,
     syncPush,
     syncPull,
     syncStatus
   } = dom;
+  const FAVICON_CACHE_TTL = 1000 * 60 * 60 * 24 * 14;
+  const faviconPending = new Map();
 
   /* ========== STORAGE HELPERS ========== */
   function loadData() {
@@ -69,8 +75,23 @@ import {
     });
   }
 
+  function loadFaviconCache() {
+    return new Promise(resolve => {
+      chrome.storage.local.get([STORAGE_KEYS.faviconCache], result => {
+        faviconCache = result[STORAGE_KEYS.faviconCache] || {};
+        resolve();
+      });
+    });
+  }
+
   function saveData() {
     saveAppData({ links, groups, settings });
+  }
+
+  function persistFaviconCache() {
+    chrome.storage.local.set({
+      [STORAGE_KEYS.faviconCache]: faviconCache
+    });
   }
 
   /* ========== CSS VARS ========== */
@@ -106,6 +127,61 @@ import {
     return !!url && !url.startsWith('chrome://') && !url.startsWith('chrome-extension://');
   }
 
+  function getCachedFavicon(url) {
+    const hostname = getHostname(url);
+    if (!hostname) return '';
+
+    const entry = faviconCache[hostname];
+    if (!entry?.dataUrl) return '';
+
+    return entry.dataUrl;
+  }
+
+  function isFaviconExpired(url) {
+    const hostname = getHostname(url);
+    if (!hostname) return true;
+    const entry = faviconCache[hostname];
+    if (!entry?.dataUrl) return true;
+    return Date.now() - (entry.updatedAt || 0) > FAVICON_CACHE_TTL;
+  }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function ensureFaviconCached(url, img) {
+    const hostname = getHostname(url);
+    const faviconUrl = getFavicon(url);
+    if (!hostname || !faviconUrl) return;
+    if (faviconPending.has(hostname)) return;
+
+    const pending = fetch(faviconUrl, { cache: 'force-cache' })
+      .then(async response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const dataUrl = await blobToDataUrl(blob);
+        faviconCache[hostname] = {
+          dataUrl,
+          updatedAt: Date.now()
+        };
+        persistFaviconCache();
+        if (img?.isConnected) {
+          img.src = dataUrl;
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        faviconPending.delete(hostname);
+      });
+
+    faviconPending.set(hostname, pending);
+  }
+
   function createLinkEl(link) {
     const el = document.createElement('a');
     el.className = 'link-item';
@@ -119,7 +195,8 @@ import {
     iconWrap.className = 'icon-wrap';
 
     const img = document.createElement('img');
-    img.src = getFavicon(link.url);
+    const cachedFavicon = getCachedFavicon(link.url);
+    img.src = cachedFavicon || getFavicon(link.url);
     img.alt = '';
     img.loading = 'lazy';
     img.onerror = () => {
@@ -130,6 +207,9 @@ import {
       iconWrap.style.color = '#58a6ff';
     };
     iconWrap.appendChild(img);
+    if (!cachedFavicon || isFaviconExpired(link.url)) {
+      ensureFaviconCached(link.url, img);
+    }
 
     const label = document.createElement('span');
     label.className = 'icon-label';
@@ -658,6 +738,7 @@ import {
     settingIconSize.value = settings.iconSize;
     settingIconSizeVal.textContent = settings.iconSize + 'px';
     loadSavedGistCredentials(dom);
+    updateVerifyStatus(dom, '');
   }
 
   function closeSettings() {
@@ -677,11 +758,59 @@ import {
     applySettings();
   });
 
+  cleanupFaviconsBtn.addEventListener('click', () => {
+    const now = Date.now();
+    faviconCache = Object.fromEntries(
+      Object.entries(faviconCache).filter(([, entry]) =>
+        entry?.dataUrl && now - (entry.updatedAt || 0) <= FAVICON_CACHE_TTL
+      )
+    );
+    persistFaviconCache();
+  });
+
   /* ========== GIST SYNC ========== */
 
   function setSyncStatus(msg, type = '') {
     updateSyncStatus(dom, msg, type);
   }
+
+  function setVerifyStatus(msg, type = '') {
+    updateVerifyStatus(dom, msg, type);
+  }
+
+  function getStoredGistId() {
+    return new Promise(resolve => {
+      chrome.storage.local.get(['gistId'], result => {
+        resolve((result.gistId || '').trim());
+      });
+    });
+  }
+
+  verifyGistTokenBtn.addEventListener('click', async () => {
+    const headers = getGistHeaders(dom);
+    if (!headers) {
+      setVerifyStatus('Nhập token trước', 'err');
+      return;
+    }
+
+    verifyGistTokenBtn.disabled = true;
+    setVerifyStatus('Đang kiểm tra token...');
+
+    try {
+      const res = await fetch('https://api.github.com/user', {
+        method: 'GET',
+        headers
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setVerifyStatus(`✓ Token hợp lệ · ${data.login}`, 'ok');
+    } catch (err) {
+      setVerifyStatus(`✗ Token không hợp lệ · ${err.message}`, 'err');
+    } finally {
+      verifyGistTokenBtn.disabled = false;
+    }
+  });
 
   // Push to Gist
   syncPush.addEventListener('click', async () => {
@@ -702,7 +831,7 @@ import {
     };
 
     try {
-      let gistId = gistIdInput.value.trim();
+      let gistId = await getStoredGistId();
       let res;
 
       if (gistId) {
@@ -724,9 +853,8 @@ import {
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 
       const data = await res.json();
-      gistIdInput.value = data.id;
 
-      // Save token & gist id
+      // Save token & gist id for later syncs
       chrome.storage.local.set({
         gistToken: gistTokenInput.value.trim(),
         gistId: data.id
@@ -745,8 +873,8 @@ import {
     const headers = getGistHeaders(dom);
     if (!headers) { setSyncStatus('Nhập token trước', 'err'); return; }
 
-    const gistId = gistIdInput.value.trim();
-    if (!gistId) { setSyncStatus('Nhập Gist ID trước', 'err'); return; }
+    const gistId = await getStoredGistId();
+    if (!gistId) { setSyncStatus('Chưa có Gist để kéo về. Hãy đẩy lên trước.', 'err'); return; }
 
     syncPull.disabled = true;
     setSyncStatus('Đang kéo về...');
@@ -823,8 +951,11 @@ import {
 
   /* ========== INIT ========== */
   bindGistCredentialInputs(dom);
-  loadData().then(() => {
+  Promise.all([loadData(), loadFaviconCache()]).then(() => {
     render();
+    requestAnimationFrame(() => {
+      document.body.classList.remove('app-loading');
+    });
   });
 
 })();
