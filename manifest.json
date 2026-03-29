@@ -9,12 +9,11 @@
   },
   "permissions": [
     "storage",
-    "contextMenus",
-    "activeTab",
     "tabs"
   ],
   "host_permissions": [
-    "https://www.google.com/*"
+    "https://www.google.com/*",
+    "https://*.gstatic.com/*"
   ],
   "background": {
     "service_worker": "src/background/index.js"

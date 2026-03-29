@@ -3,7 +3,6 @@ import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
 import { getFavicon, getHostname, autoTitle } from '../shared/utils/link-utils.js';
 import { getDomRefs } from './dom.js';
 import { loadAppData, saveAppData } from './storage.js';
-import { bindContextMenu } from './context-menu.js';
 import {
   setSyncStatus as updateSyncStatus,
   setVerifyStatus as updateVerifyStatus,
@@ -24,8 +23,8 @@ import {
   let faviconCache = {};
   let editingLinkId = null;
   let editingGroupName = null; // group name being renamed
-  let contextLinkId = null; // link right-clicked on (null if clicked on empty area)
-  let contextGroup = null;  // which group area was right-clicked
+  let contextLinkId = null;
+  let contextGroup = null;
   let contextMenuMode = 'general';
   let modalMode = null; // 'add-link', 'edit-link', 'add-group'
 
@@ -145,26 +144,20 @@ import {
     return Date.now() - (entry.updatedAt || 0) > FAVICON_CACHE_TTL;
   }
 
-  function blobToDataUrl(blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
   async function ensureFaviconCached(url, img) {
     const hostname = getHostname(url);
     const faviconUrl = getFavicon(url);
     if (!hostname || !faviconUrl) return;
     if (faviconPending.has(hostname)) return;
 
-    const pending = fetch(faviconUrl, { cache: 'force-cache' })
-      .then(async response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
-        const dataUrl = await blobToDataUrl(blob);
+    const pending = new Promise(resolve => {
+      chrome.runtime.sendMessage({ type: 'fetch-favicon', url: faviconUrl }, async response => {
+        if (chrome.runtime.lastError || !response?.ok || !response.dataUrl) {
+          resolve();
+          return;
+        }
+
+        const dataUrl = response.dataUrl;
         faviconCache[hostname] = {
           dataUrl,
           updatedAt: Date.now()
@@ -173,9 +166,9 @@ import {
         if (img?.isConnected) {
           img.src = dataUrl;
         }
-      })
-      .catch(() => {})
-      .finally(() => {
+        resolve();
+      });
+    }).finally(() => {
         faviconPending.delete(hostname);
       });
 
@@ -221,13 +214,6 @@ import {
     // Click navigates (prevent if dragging)
     el.addEventListener('click', e => {
       if (el.classList.contains('dragging')) { e.preventDefault(); }
-    });
-
-    // Context menu
-    el.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      showContextMenu(e.pageX, e.pageY, link._id, link.parent);
     });
 
     // Drag events – only within same group
@@ -281,8 +267,9 @@ import {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       touchTimeout = setTimeout(() => {
+        if (!contextMenu.classList.contains('hidden')) return;
         isDragging = true;
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
         el.classList.add('dragging');
 
         clone = el.cloneNode(true);
@@ -297,7 +284,7 @@ import {
         clone.style.top = rect.top + 'px';
         clone.style.width = rect.width + 'px';
         document.body.appendChild(clone);
-      }, 400);
+      }, 700);
     }, { passive: false });
 
     el.addEventListener('touchmove', e => {
@@ -307,7 +294,7 @@ import {
         if (dx > 10 || dy > 10) clearTimeout(touchTimeout);
         return;
       }
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       const touch = e.touches[0];
       if (clone) {
         const offset = (settings.iconSize || 56) / 2;
@@ -361,7 +348,7 @@ import {
 
       el.classList.remove('dragging');
       document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
     });
 
     el.addEventListener('touchcancel', () => {
@@ -478,49 +465,56 @@ import {
   }
 
   /* ========== CONTEXT MENU ========== */
-  function showContextMenu(x, y, linkId, group) {
+  function showContextMenu({ x, y, mode = 'general', linkId = null, groupName = null }) {
+    contextMenuMode = mode;
     contextLinkId = linkId;
-    contextGroup = group || selectedGroup;
-    contextMenu.classList.remove('hidden');
+    contextGroup = groupName || selectedGroup;
 
-    // Show/hide link-specific items
     const addLinkBtn = contextMenu.querySelector('[data-action="add-link"]');
     const addGroupBtn = contextMenu.querySelector('[data-action="add-group"]');
-    const linkOnlyBtns = contextMenu.querySelectorAll('.ctx-link-only');
-    const groupOnlyBtns = contextMenu.querySelectorAll('.ctx-group-only');
     const pinGroupBtn = contextMenu.querySelector('[data-action="pin-group"]');
     const deleteGroupBtn = contextMenu.querySelector('[data-action="delete-group"]');
+    const linkOnlyBtns = contextMenu.querySelectorAll('.ctx-link-only');
+    const groupOnlyBtns = contextMenu.querySelectorAll('.ctx-group-only');
     const sep = contextMenu.querySelector('.ctx-sep');
-    if (contextMenuMode === 'group') {
-      linkOnlyBtns.forEach(b => b.classList.add('hidden'));
-      groupOnlyBtns.forEach(b => b.classList.remove('hidden'));
-      if (addLinkBtn) addLinkBtn.classList.add('hidden');
-      if (addGroupBtn) addGroupBtn.classList.remove('hidden');
+
+    if (mode === 'group') {
+      addLinkBtn?.classList.add('hidden');
+      addGroupBtn?.classList.remove('hidden');
+      linkOnlyBtns.forEach(btn => btn.classList.add('hidden'));
+      groupOnlyBtns.forEach(btn => btn.classList.remove('hidden'));
       if (pinGroupBtn) {
-        pinGroupBtn.textContent = groups.pinned.includes(contextGroup) ? '📍 Bỏ ghim nhóm' : '📌 Ghim nhóm';
+        pinGroupBtn.innerHTML = groups.pinned.includes(contextGroup)
+          ? '<span class="menu-icon">📍</span>Bỏ ghim nhóm'
+          : '<span class="menu-icon">📌</span>Ghim nhóm';
       }
-      if (deleteGroupBtn && groups.list.length <= 2) {
-        deleteGroupBtn.classList.add('hidden');
+      if (deleteGroupBtn) {
+        deleteGroupBtn.classList.toggle('hidden', groups.list.length <= 2);
       }
-      if (sep) sep.classList.add('hidden');
-    } else if (linkId) {
-      linkOnlyBtns.forEach(b => b.classList.remove('hidden'));
-      groupOnlyBtns.forEach(b => b.classList.add('hidden'));
-      if (addLinkBtn) addLinkBtn.classList.remove('hidden');
-      if (addGroupBtn) addGroupBtn.classList.remove('hidden');
-      if (sep) sep.classList.remove('hidden');
+      sep?.classList.add('hidden');
+    } else if (mode === 'link') {
+      addLinkBtn?.classList.remove('hidden');
+      addGroupBtn?.classList.remove('hidden');
+      linkOnlyBtns.forEach(btn => btn.classList.remove('hidden'));
+      groupOnlyBtns.forEach(btn => btn.classList.add('hidden'));
+      sep?.classList.remove('hidden');
     } else {
-      linkOnlyBtns.forEach(b => b.classList.add('hidden'));
-      groupOnlyBtns.forEach(b => b.classList.add('hidden'));
-      if (addGroupBtn) addGroupBtn.classList.remove('hidden');
-      if (sep) sep.classList.add('hidden');
+      addLinkBtn?.classList.remove('hidden');
+      addGroupBtn?.classList.remove('hidden');
+      linkOnlyBtns.forEach(btn => btn.classList.add('hidden'));
+      groupOnlyBtns.forEach(btn => btn.classList.add('hidden'));
+      sep?.classList.add('hidden');
     }
 
-    contextMenu.style.left = Math.min(x, window.innerWidth - 170) + 'px';
-    contextMenu.style.top = Math.min(y, window.innerHeight - 160) + 'px';
+    const maxX = Math.max(8, window.innerWidth - 170);
+    const maxY = Math.max(8, window.innerHeight - 220);
+    contextMenu.style.left = Math.min(Math.max(8, x), maxX) + 'px';
+    contextMenu.style.top = Math.min(Math.max(8, y), maxY) + 'px';
+    contextMenu.classList.remove('hidden');
   }
 
   function hideContextMenu() {
+    if (contextMenu.classList.contains('hidden')) return;
     contextMenu.classList.add('hidden');
     contextLinkId = null;
     contextGroup = null;
@@ -564,24 +558,177 @@ import {
     render();
   }
 
-  bindContextMenu({
-    documentRef: document,
-    contextMenu,
-    getSelectedGroup: () => contextGroup || selectedGroup,
-    getGroups: () => groups,
-    showContextMenu,
-    hideContextMenu,
-    setContextMenuMode: value => { contextMenuMode = value; },
-    setContextLinkId: value => { contextLinkId = value; },
-    getContextLinkId: () => contextLinkId,
-    setLinks: value => { links = value; },
-    getLinks: () => links,
-    saveData,
-    render,
-    openModal,
-    togglePinGroup,
-    deleteGroup
-  });
+  function deleteLink(linkId) {
+    if (!linkId) return;
+    const target = links.find(l => l._id === linkId);
+    if (!target) return;
+    if (!confirm(`Xoá link "${target.title || target.url}"?`)) return;
+
+    links = links.filter(l => l._id !== linkId);
+    const sameGroup = getLinksForGroup(target.parent);
+    sameGroup.forEach((item, idx) => { item.order = idx; });
+    saveData();
+    render();
+  }
+
+  function handleMenuAction(action) {
+    if (action === 'add-link') {
+      fillAddLinkModal('', '', contextGroup || selectedGroup);
+      return;
+    }
+
+    if (action === 'add-group') {
+      openModal('add-group');
+      return;
+    }
+
+    if (action === 'edit') {
+      if (!contextLinkId) return;
+      const link = links.find(l => l._id === contextLinkId);
+      if (link) openModal('edit-link', link);
+      return;
+    }
+
+    if (action === 'delete') {
+      deleteLink(contextLinkId);
+      return;
+    }
+
+    if (action === 'pin-group') {
+      togglePinGroup(contextGroup || selectedGroup);
+      return;
+    }
+
+    if (action === 'delete-group') {
+      deleteGroup(contextGroup || selectedGroup);
+    }
+  }
+
+  function bindContextMenu() {
+    document.addEventListener('contextmenu', e => {
+      const onMenu = e.target.closest('#context-menu');
+      const onModal = e.target.closest('.modal') || e.target.closest('.settings-modal');
+      if (onMenu || onModal) return;
+
+      const linkEl = e.target.closest('.link-item');
+      if (linkEl) {
+        e.preventDefault();
+        showContextMenu({
+          x: e.pageX,
+          y: e.pageY,
+          mode: 'link',
+          linkId: linkEl.dataset.id,
+          groupName: linkEl.dataset.parent
+        });
+        return;
+      }
+
+      const groupEl = e.target.closest('.group-context-target');
+      if (groupEl) {
+        e.preventDefault();
+        showContextMenu({
+          x: e.pageX,
+          y: e.pageY,
+          mode: 'group',
+          groupName: groupEl.dataset.groupName || selectedGroup
+        });
+        return;
+      }
+
+      if (e.target.closest('#main-container')) {
+        e.preventDefault();
+        showContextMenu({
+          x: e.pageX,
+          y: e.pageY,
+          mode: 'general',
+          groupName: selectedGroup
+        });
+      }
+    });
+
+    let longPressTimer = null;
+    let longPressStartX = 0;
+    let longPressStartY = 0;
+    let longPressTarget = null;
+
+    document.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1) return;
+      const target = e.target;
+      if (target.closest('.modal') || target.closest('.settings-modal') || target.closest('#context-menu')) return;
+
+      const touch = e.touches[0];
+      longPressStartX = touch.clientX;
+      longPressStartY = touch.clientY;
+      longPressTarget = target;
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        const linkEl = longPressTarget?.closest('.link-item');
+        if (linkEl) {
+          showContextMenu({
+            x: touch.pageX,
+            y: touch.pageY,
+            mode: 'link',
+            linkId: linkEl.dataset.id,
+            groupName: linkEl.dataset.parent
+          });
+          return;
+        }
+
+        const groupEl = longPressTarget?.closest('.group-context-target');
+        if (groupEl) {
+          showContextMenu({
+            x: touch.pageX,
+            y: touch.pageY,
+            mode: 'group',
+            groupName: groupEl.dataset.groupName || selectedGroup
+          });
+          return;
+        }
+
+        if (longPressTarget?.closest('#main-container')) {
+          showContextMenu({
+            x: touch.pageX,
+            y: touch.pageY,
+            mode: 'general',
+            groupName: selectedGroup
+          });
+        }
+      }, 480);
+    }, { passive: true });
+
+    document.addEventListener('touchmove', e => {
+      if (!longPressTimer || e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const dx = Math.abs(touch.clientX - longPressStartX);
+      const dy = Math.abs(touch.clientY - longPressStartY);
+      if (dx > 10 || dy > 10) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    }, { passive: true });
+
+    const clearLongPress = () => {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      longPressTarget = null;
+    };
+    document.addEventListener('touchend', clearLongPress, { passive: true });
+    document.addEventListener('touchcancel', clearLongPress, { passive: true });
+
+    contextMenu.addEventListener('click', e => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      handleMenuAction(btn.dataset.action);
+      hideContextMenu();
+    });
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#context-menu')) hideContextMenu();
+    });
+
+    window.addEventListener('resize', hideContextMenu);
+    window.addEventListener('scroll', hideContextMenu, { passive: true });
+  }
 
   /* ========== MODAL ========== */
   function openModal(mode, link = null, defaultGroup = null) {
@@ -786,6 +933,27 @@ import {
     });
   }
 
+  async function findExistingSyncGistId(headers) {
+    const res = await fetch('https://api.github.com/gists?per_page=100', {
+      method: 'GET',
+      headers
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const gists = await res.json();
+    if (!Array.isArray(gists)) return '';
+
+    const match = gists.find(g =>
+      g?.files?.['quicklinks_data.json'] ||
+      g?.description === 'QuickLinks Homepage Sync'
+    );
+
+    if (!match?.id) return '';
+
+    chrome.storage.local.set({ gistId: match.id });
+    return match.id;
+  }
+
   verifyGistTokenBtn.addEventListener('click', async () => {
     const headers = getGistHeaders(dom);
     if (!headers) {
@@ -832,6 +1000,9 @@ import {
 
     try {
       let gistId = await getStoredGistId();
+      if (!gistId) {
+        gistId = await findExistingSyncGistId(headers);
+      }
       let res;
 
       if (gistId) {
@@ -873,8 +1044,17 @@ import {
     const headers = getGistHeaders(dom);
     if (!headers) { setSyncStatus('Nhập token trước', 'err'); return; }
 
-    const gistId = await getStoredGistId();
-    if (!gistId) { setSyncStatus('Chưa có Gist để kéo về. Hãy đẩy lên trước.', 'err'); return; }
+    let gistId = await getStoredGistId();
+    if (!gistId) {
+      setSyncStatus('Đang dò Gist cũ...');
+      try {
+        gistId = await findExistingSyncGistId(headers);
+      } catch (err) {
+        setSyncStatus('✗ Không dò được Gist: ' + err.message, 'err');
+        return;
+      }
+    }
+    if (!gistId) { setSyncStatus('Chưa có gist để kéo về. Hãy đẩy lên trước.', 'err'); return; }
 
     syncPull.disabled = true;
     setSyncStatus('Đang kéo về...');
@@ -951,6 +1131,7 @@ import {
 
   /* ========== INIT ========== */
   bindGistCredentialInputs(dom);
+  bindContextMenu();
   Promise.all([loadData(), loadFaviconCache()]).then(() => {
     render();
     requestAnimationFrame(() => {
