@@ -18,6 +18,13 @@ body {
   -webkit-user-select: none;
 }
 
+button,
+a,
+input,
+select {
+  touch-action: manipulation;
+}
+
 body {
   display: flex;
   flex-direction: column;
@@ -26,8 +33,15 @@ body {
   min-height: 100vh;
 }
 
+body.edit-mode {
+  background:
+    radial-gradient(circle at top, rgba(31, 111, 235, 0.12), transparent 32%),
+    #0d1117;
+}
+
 body.app-loading #main-container,
-body.app-loading #settings-btn {
+body.app-loading #settings-btn,
+body.app-loading #edit-mode-btn {
   visibility: hidden;
 }
 
@@ -146,6 +160,10 @@ body:not(.app-loading) #loading-shell {
   color: #e6edf3;
 }
 
+body.edit-mode .quick-action-btn {
+  color: #58a6ff;
+}
+
 .quick-action-status {
   display: none;
   text-align: left;
@@ -192,6 +210,11 @@ body:not(.app-loading) #loading-shell {
   text-decoration: none;
   position: relative;
   transition: opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body:not(.edit-mode) .link-item {
+  cursor: pointer;
 }
 
 .link-item:active {
@@ -208,6 +231,13 @@ body:not(.app-loading) #loading-shell {
   justify-content: center;
   transition: transform 0.15s ease;
   overflow: hidden;
+}
+
+.link-item.fallback-ready .icon-wrap {
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 18px;
+  font-weight: 700;
+  color: #58a6ff;
 }
 
 .link-item:hover .icon-wrap {
@@ -232,6 +262,30 @@ body:not(.app-loading) #loading-shell {
   white-space: nowrap;
   line-height: 1.3;
   pointer-events: none;
+}
+
+.link-edit-badge {
+  position: absolute;
+  top: 0;
+  right: 10px;
+  display: none;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(248, 81, 73, 0.88);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+body.edit-mode .link-edit-badge {
+  display: inline-flex;
 }
 
 /* Drag states */
@@ -276,11 +330,29 @@ body:not(.app-loading) #loading-shell {
   color: #e6edf3;
 }
 
+body.edit-mode #group-tabs .tab,
+body.edit-mode .pinned-group-header {
+  color: #9ecbff;
+}
+
+body.edit-mode #group-tabs .tab,
+body.edit-mode .group-context-target {
+  position: relative;
+}
+
+.tab-add-group {
+  padding: 5px 12px !important;
+  border-radius: 16px;
+  border: 1px dashed rgba(88, 166, 255, 0.45) !important;
+  color: #58a6ff !important;
+  min-width: 34px;
+}
+
 /* ===== Settings Button ===== */
+#edit-mode-btn,
 #settings-btn {
   position: fixed;
   bottom: 20px;
-  right: 20px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -295,52 +367,33 @@ body:not(.app-loading) #loading-shell {
   z-index: 100;
 }
 
+#edit-mode-btn {
+  left: 20px;
+  width: 40px;
+  min-width: 40px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(31, 111, 235, 0.16);
+  color: #9ecbff;
+}
+
+#settings-btn {
+  right: 20px;
+}
+
+body.edit-mode #edit-mode-btn {
+  background: #1f6feb;
+  color: #fff;
+}
+
+#edit-mode-btn:hover,
 #settings-btn:hover {
   color: #e6edf3;
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* ===== Context Menu ===== */
-.context-menu {
-  position: fixed;
-  min-width: 132px;
-  max-width: 160px;
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 3px 0;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
-  z-index: 250;
-}
-
-.context-menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: #c9d1d9;
-  text-align: left;
-  font-size: 12px;
-  padding: 7px 11px;
-  cursor: pointer;
-}
-
-.context-menu button:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.menu-icon {
-  width: 14px;
-  text-align: center;
-  flex: 0 0 14px;
-}
-
-.ctx-sep {
-  height: 1px;
-  margin: 3px 0;
-  background: rgba(255, 255, 255, 0.08);
+#edit-mode-btn svg {
+  display: block;
 }
 
 /* ===== Modal ===== */
@@ -525,6 +578,25 @@ body:not(.app-loading) #loading-shell {
 #modal-save {
   background: #1f6feb;
   color: #fff;
+}
+
+#modal-delete {
+  margin-right: auto;
+  background: rgba(248, 81, 73, 0.14);
+  color: #f85149;
+}
+
+#modal-pin {
+  background: rgba(31, 111, 235, 0.14);
+  color: #9ecbff;
+}
+
+#modal-pin:hover {
+  background: rgba(31, 111, 235, 0.22);
+}
+
+#modal-delete:hover {
+  background: rgba(248, 81, 73, 0.22);
 }
 
 #modal-save:hover {

@@ -23,10 +23,9 @@ import {
   let faviconCache = {};
   let editingLinkId = null;
   let editingGroupName = null; // group name being renamed
-  let contextLinkId = null;
-  let contextGroup = null;
-  let contextMenuMode = 'general';
   let modalMode = null; // 'add-link', 'edit-link', 'add-group'
+  let suppressStorageSync = false;
+  let isEditMode = false;
 
   /* ========== DOM REFS ========== */
   const dom = getDomRefs();
@@ -36,8 +35,8 @@ import {
     pinnedGrid,
     groupTabs,
     selectedGrid,
+    editModeBtn,
     settingsBtn,
-    contextMenu,
     modalOverlay,
     modalTitle,
     modalBodyLink,
@@ -46,6 +45,8 @@ import {
     inputName,
     inputGroup,
     inputGroupName,
+    modalPin,
+    modalDelete,
     modalCancel,
     modalSave,
     settingsOverlay,
@@ -62,6 +63,7 @@ import {
   } = dom;
   const FAVICON_CACHE_TTL = 1000 * 60 * 60 * 24 * 14;
   const faviconPending = new Map();
+  const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 
   /* ========== STORAGE HELPERS ========== */
   function loadData() {
@@ -84,13 +86,25 @@ import {
   }
 
   function saveData() {
+    suppressStorageSync = true;
     saveAppData({ links, groups, settings });
+    setTimeout(() => {
+      suppressStorageSync = false;
+    }, 0);
   }
 
   function persistFaviconCache() {
     chrome.storage.local.set({
       [STORAGE_KEYS.faviconCache]: faviconCache
     });
+  }
+
+  function queueIdleTask(task, timeout = 250) {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(task, { timeout });
+      return;
+    }
+    window.setTimeout(task, 32);
   }
 
   /* ========== CSS VARS ========== */
@@ -112,6 +126,24 @@ import {
     if (!quickActionStatus) return;
     quickActionStatus.textContent = message;
     quickActionStatus.className = 'quick-action-status' + (type ? ` ${type}` : '');
+  }
+
+  function setEditMode(nextValue) {
+    isEditMode = !!nextValue;
+    document.body.classList.toggle('edit-mode', isEditMode);
+    editModeBtn.title = isEditMode ? 'Thoát chỉnh sửa' : 'Chỉnh sửa';
+  }
+
+  function enterEditMode() {
+    if (isEditMode) return;
+    setEditMode(true);
+    render();
+  }
+
+  function exitEditMode() {
+    if (!isEditMode) return;
+    setEditMode(false);
+    render();
   }
 
   function fillAddLinkModal(url = '', title = '', group = selectedGroup) {
@@ -163,7 +195,19 @@ import {
           updatedAt: Date.now()
         };
         persistFaviconCache();
-        if (img?.isConnected) {
+        const relatedImgs = document.querySelectorAll(`img[data-hostname="${hostname}"]`);
+        relatedImgs.forEach(node => {
+          if (!node.isConnected) return;
+          node.src = dataUrl;
+          const item = node.closest('.link-item');
+          const wrap = node.closest('.icon-wrap');
+          item?.classList.remove('fallback-ready');
+          if (wrap) {
+            wrap.textContent = '';
+            wrap.appendChild(node);
+          }
+        });
+        if (img?.isConnected && !relatedImgs.length) {
           img.src = dataUrl;
         }
         resolve();
@@ -181,183 +225,48 @@ import {
     el.href = link.url;
     el.dataset.id = link._id;
     el.dataset.parent = link.parent;
-    el.draggable = true;
+    el.draggable = isEditMode;
     el.title = link.title || link.url;
 
     const iconWrap = document.createElement('div');
     iconWrap.className = 'icon-wrap';
 
     const img = document.createElement('img');
+    const hostname = getHostname(link.url);
     const cachedFavicon = getCachedFavicon(link.url);
-    img.src = cachedFavicon || getFavicon(link.url);
+    img.dataset.hostname = hostname;
     img.alt = '';
-    img.loading = 'lazy';
+    img.loading = 'eager';
+    img.decoding = 'async';
     img.onerror = () => {
       img.style.display = 'none';
       iconWrap.textContent = (link.title || '?')[0].toUpperCase();
-      iconWrap.style.fontSize = '18px';
-      iconWrap.style.fontWeight = '700';
-      iconWrap.style.color = '#58a6ff';
+      el.classList.add('fallback-ready');
     };
-    iconWrap.appendChild(img);
+    if (cachedFavicon) {
+      img.src = cachedFavicon;
+      iconWrap.appendChild(img);
+    } else {
+      iconWrap.textContent = (link.title || '?')[0].toUpperCase();
+      el.classList.add('fallback-ready');
+    }
     if (!cachedFavicon || isFaviconExpired(link.url)) {
-      ensureFaviconCached(link.url, img);
+      queueIdleTask(() => ensureFaviconCached(link.url, img));
     }
 
     const label = document.createElement('span');
     label.className = 'icon-label';
     label.textContent = link.title || autoTitle(link.url);
 
+    const editBadge = document.createElement('span');
+    editBadge.className = 'link-edit-badge';
+    editBadge.textContent = 'X';
+
     el.appendChild(iconWrap);
     el.appendChild(label);
-
-    // Click navigates (prevent if dragging)
-    el.addEventListener('click', e => {
-      if (el.classList.contains('dragging')) { e.preventDefault(); }
-    });
-
-    // Drag events – only within same group
-    el.addEventListener('dragstart', e => {
-      el.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', link._id);
-      e.dataTransfer.setData('application/group', link.parent);
-    });
-
-    el.addEventListener('dragend', () => {
-      el.classList.remove('dragging');
-      document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
-    });
-
-    el.addEventListener('dragover', e => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      const draggedParent = document.querySelector('.link-item.dragging');
-      if (draggedParent && draggedParent.dataset.id !== link._id) {
-        el.classList.add('drag-over');
-      }
-    });
-
-    el.addEventListener('dragleave', () => {
-      el.classList.remove('drag-over');
-    });
-
-    el.addEventListener('drop', e => {
-      e.preventDefault();
-      el.classList.remove('drag-over');
-      const draggedId = e.dataTransfer.getData('text/plain');
-      if (!draggedId || draggedId === link._id) return;
-      reorderLink(draggedId, link._id, link.parent);
-    });
-
-    // Touch drag
-    setupTouchDrag(el, link);
+    el.appendChild(editBadge);
 
     return el;
-  }
-
-  /* ========== TOUCH DRAG ========== */
-  function setupTouchDrag(el, link) {
-    let touchTimeout = null;
-    let isDragging = false;
-    let clone = null;
-    let startX, startY;
-
-    el.addEventListener('touchstart', e => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      touchTimeout = setTimeout(() => {
-        if (!contextMenu.classList.contains('hidden')) return;
-        isDragging = true;
-        if (e.cancelable) e.preventDefault();
-        el.classList.add('dragging');
-
-        clone = el.cloneNode(true);
-        clone.style.position = 'fixed';
-        clone.style.pointerEvents = 'none';
-        clone.style.zIndex = '500';
-        clone.style.opacity = '0.8';
-        clone.style.transform = 'scale(1.1)';
-        clone.style.transition = 'none';
-        const rect = el.getBoundingClientRect();
-        clone.style.left = rect.left + 'px';
-        clone.style.top = rect.top + 'px';
-        clone.style.width = rect.width + 'px';
-        document.body.appendChild(clone);
-      }, 700);
-    }, { passive: false });
-
-    el.addEventListener('touchmove', e => {
-      if (!isDragging) {
-        const dx = Math.abs(e.touches[0].clientX - startX);
-        const dy = Math.abs(e.touches[0].clientY - startY);
-        if (dx > 10 || dy > 10) clearTimeout(touchTimeout);
-        return;
-      }
-      if (e.cancelable) e.preventDefault();
-      const touch = e.touches[0];
-      if (clone) {
-        const offset = (settings.iconSize || 56) / 2;
-        clone.style.left = (touch.clientX - offset) + 'px';
-        clone.style.top = (touch.clientY - offset) + 'px';
-      }
-
-      if (clone) clone.style.display = 'none';
-      const target = document.elementFromPoint(touch.clientX, touch.clientY);
-      if (clone) clone.style.display = '';
-      document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
-      if (target) {
-        const targetItem = target.closest('.link-item');
-        if (targetItem && targetItem.dataset.id !== link._id) {
-          targetItem.classList.add('drag-over');
-        }
-      }
-    }, { passive: false });
-
-    el.addEventListener('touchend', e => {
-      clearTimeout(touchTimeout);
-      if (!isDragging) return;
-      isDragging = false;
-
-      if (clone) {
-        const touch = e.changedTouches[0];
-        clone.style.display = 'none';
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        document.body.removeChild(clone);
-        clone = null;
-
-        if (target) {
-          const targetItem = target.closest('.link-item');
-          if (targetItem && targetItem.dataset.id !== link._id) {
-            reorderLink(link._id, targetItem.dataset.id, targetItem.dataset.parent);
-          } else {
-            // Check if dropped directly on a grid
-            const grid = target.closest('.links-grid');
-            if (grid && grid.dataset.group) {
-              const dragged = links.find(l => l._id === link._id);
-              if (dragged) {
-                dragged.parent = grid.dataset.group;
-                dragged.order = getLinksForGroup(grid.dataset.group).length;
-                saveData();
-                render();
-              }
-            }
-          }
-        }
-      }
-
-      el.classList.remove('dragging');
-      document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
-      if (e.cancelable) e.preventDefault();
-    });
-
-    el.addEventListener('touchcancel', () => {
-      clearTimeout(touchTimeout);
-      isDragging = false;
-      if (clone) { document.body.removeChild(clone); clone = null; }
-      el.classList.remove('dragging');
-      document.querySelectorAll('.drag-over').forEach(d => d.classList.remove('drag-over'));
-    });
   }
 
   /* ========== REORDER (can change group) ========== */
@@ -408,24 +317,6 @@ import {
       header.dataset.groupName = groupName;
       header.classList.add('group-context-target');
 
-      // Drop zone for empty grid or general grid area
-      grid.addEventListener('dragover', e => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-      });
-      grid.addEventListener('drop', e => {
-        if (e.target !== grid) return;
-        const draggedId = e.dataTransfer.getData('text/plain');
-        if (!draggedId) return;
-        const dragged = links.find(l => l._id === draggedId);
-        if (dragged) {
-          dragged.parent = groupName;
-          dragged.order = getLinksForGroup(groupName).length;
-          saveData();
-          render();
-        }
-      });
-
       pinnedGrid.appendChild(grid);
 
       if (groupName === groups.pinned[0]) {
@@ -447,14 +338,17 @@ import {
       tab.textContent = g;
       tab.dataset.groupName = g;
       tab.classList.add('group-context-target');
-      tab.addEventListener('click', () => {
-        selectedGroup = g;
-        groups.selected = g;
-        saveData();
-        render();
-      });
       groupTabs.appendChild(tab);
     });
+
+    if (isEditMode) {
+      const addTab = document.createElement('button');
+      addTab.className = 'tab tab-add-group';
+      addTab.type = 'button';
+      addTab.textContent = '+';
+      addTab.dataset.action = 'add-group';
+      groupTabs.appendChild(addTab);
+    }
 
     // Selected group
     selectedGrid.innerHTML = '';
@@ -465,62 +359,6 @@ import {
   }
 
   /* ========== CONTEXT MENU ========== */
-  function showContextMenu({ x, y, mode = 'general', linkId = null, groupName = null }) {
-    contextMenuMode = mode;
-    contextLinkId = linkId;
-    contextGroup = groupName || selectedGroup;
-
-    const addLinkBtn = contextMenu.querySelector('[data-action="add-link"]');
-    const addGroupBtn = contextMenu.querySelector('[data-action="add-group"]');
-    const pinGroupBtn = contextMenu.querySelector('[data-action="pin-group"]');
-    const deleteGroupBtn = contextMenu.querySelector('[data-action="delete-group"]');
-    const linkOnlyBtns = contextMenu.querySelectorAll('.ctx-link-only');
-    const groupOnlyBtns = contextMenu.querySelectorAll('.ctx-group-only');
-    const sep = contextMenu.querySelector('.ctx-sep');
-
-    if (mode === 'group') {
-      addLinkBtn?.classList.add('hidden');
-      addGroupBtn?.classList.remove('hidden');
-      linkOnlyBtns.forEach(btn => btn.classList.add('hidden'));
-      groupOnlyBtns.forEach(btn => btn.classList.remove('hidden'));
-      if (pinGroupBtn) {
-        pinGroupBtn.innerHTML = groups.pinned.includes(contextGroup)
-          ? '<span class="menu-icon">📍</span>Bỏ ghim nhóm'
-          : '<span class="menu-icon">📌</span>Ghim nhóm';
-      }
-      if (deleteGroupBtn) {
-        deleteGroupBtn.classList.toggle('hidden', groups.list.length <= 2);
-      }
-      sep?.classList.add('hidden');
-    } else if (mode === 'link') {
-      addLinkBtn?.classList.remove('hidden');
-      addGroupBtn?.classList.remove('hidden');
-      linkOnlyBtns.forEach(btn => btn.classList.remove('hidden'));
-      groupOnlyBtns.forEach(btn => btn.classList.add('hidden'));
-      sep?.classList.remove('hidden');
-    } else {
-      addLinkBtn?.classList.remove('hidden');
-      addGroupBtn?.classList.remove('hidden');
-      linkOnlyBtns.forEach(btn => btn.classList.add('hidden'));
-      groupOnlyBtns.forEach(btn => btn.classList.add('hidden'));
-      sep?.classList.add('hidden');
-    }
-
-    const maxX = Math.max(8, window.innerWidth - 170);
-    const maxY = Math.max(8, window.innerHeight - 220);
-    contextMenu.style.left = Math.min(Math.max(8, x), maxX) + 'px';
-    contextMenu.style.top = Math.min(Math.max(8, y), maxY) + 'px';
-    contextMenu.classList.remove('hidden');
-  }
-
-  function hideContextMenu() {
-    if (contextMenu.classList.contains('hidden')) return;
-    contextMenu.classList.add('hidden');
-    contextLinkId = null;
-    contextGroup = null;
-    contextMenuMode = 'general';
-  }
-
   function togglePinGroup(groupName) {
     if (!groupName) return;
 
@@ -571,129 +409,183 @@ import {
     render();
   }
 
-  function handleMenuAction(action) {
-    if (action === 'add-link') {
-      fillAddLinkModal('', '', contextGroup || selectedGroup);
-      return;
-    }
-
-    if (action === 'add-group') {
-      openModal('add-group');
-      return;
-    }
-
-    if (action === 'edit') {
-      if (!contextLinkId) return;
-      const link = links.find(l => l._id === contextLinkId);
-      if (link) openModal('edit-link', link);
-      return;
-    }
-
-    if (action === 'delete') {
-      deleteLink(contextLinkId);
-      return;
-    }
-
-    if (action === 'pin-group') {
-      togglePinGroup(contextGroup || selectedGroup);
-      return;
-    }
-
-    if (action === 'delete-group') {
-      deleteGroup(contextGroup || selectedGroup);
-    }
+  function openLinkEditor(linkId) {
+    if (!linkId) return;
+    const link = links.find(item => item._id === linkId);
+    if (link) openModal('edit-link', link);
   }
 
-  function bindContextMenu() {
-    document.addEventListener('contextmenu', e => {
-      const onMenu = e.target.closest('#context-menu');
-      const onModal = e.target.closest('.modal') || e.target.closest('.settings-modal');
-      if (onMenu || onModal) return;
+  function openGroupEditor(groupName) {
+    if (!groupName) return;
+    openModal('edit-group', groupName);
+  }
 
-      const linkEl = e.target.closest('.link-item');
-      if (linkEl) {
+  function bindGridInteractions() {
+    document.addEventListener('click', e => {
+      const deleteBadge = e.target.closest('.link-edit-badge');
+      if (deleteBadge && isEditMode) {
         e.preventDefault();
-        showContextMenu({
-          x: e.pageX,
-          y: e.pageY,
-          mode: 'link',
-          linkId: linkEl.dataset.id,
-          groupName: linkEl.dataset.parent
-        });
+        e.stopPropagation();
+        const link = deleteBadge.closest('.link-item');
+        if (link) deleteLink(link.dataset.id);
         return;
       }
 
-      const groupEl = e.target.closest('.group-context-target');
-      if (groupEl) {
+      const link = e.target.closest('.link-item');
+      if (link && isEditMode) {
         e.preventDefault();
-        showContextMenu({
-          x: e.pageX,
-          y: e.pageY,
-          mode: 'group',
-          groupName: groupEl.dataset.groupName || selectedGroup
-        });
+        openLinkEditor(link.dataset.id);
         return;
       }
 
-      if (e.target.closest('#main-container')) {
+      const groupTarget = e.target.closest('.group-context-target');
+      if (groupTarget && isEditMode) {
         e.preventDefault();
-        showContextMenu({
-          x: e.pageX,
-          y: e.pageY,
-          mode: 'general',
-          groupName: selectedGroup
-        });
+        openGroupEditor(groupTarget.dataset.groupName || selectedGroup);
+        return;
+      }
+
+      const tab = e.target.closest('#group-tabs .tab');
+      if (tab) {
+        if (tab.dataset.action === 'add-group') {
+          e.preventDefault();
+          enterEditMode();
+          openModal('add-group');
+          return;
+        }
+        if (isEditMode) return;
+        selectedGroup = tab.dataset.groupName;
+        groups.selected = selectedGroup;
+        saveData();
+        render();
+        return;
       }
     });
 
+    document.addEventListener('dragstart', e => {
+      if (!isEditMode) {
+        e.preventDefault();
+        return;
+      }
+      const item = e.target.closest('.link-item');
+      if (!item) return;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', item.dataset.id);
+      e.dataTransfer.setData('application/group', item.dataset.parent);
+    });
+
+    document.addEventListener('dragend', e => {
+      const item = e.target.closest('.link-item');
+      item?.classList.remove('dragging');
+      document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+    });
+
+    document.addEventListener('dragover', e => {
+      if (!isEditMode) return;
+      const item = e.target.closest('.link-item');
+      const grid = e.target.closest('.links-grid');
+      if (!item && !grid) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+      if (item) {
+        const dragging = document.querySelector('.link-item.dragging');
+        if (dragging && dragging.dataset.id !== item.dataset.id) {
+          item.classList.add('drag-over');
+        }
+      }
+    });
+
+    document.addEventListener('dragleave', e => {
+      const item = e.target.closest('.link-item');
+      item?.classList.remove('drag-over');
+    });
+
+    document.addEventListener('drop', e => {
+      if (!isEditMode) return;
+      const item = e.target.closest('.link-item');
+      const grid = e.target.closest('.links-grid');
+      if (!item && !grid) return;
+      e.preventDefault();
+      document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+      const draggedId = e.dataTransfer.getData('text/plain');
+      if (!draggedId) return;
+
+      if (item) {
+        if (draggedId !== item.dataset.id) {
+          reorderLink(draggedId, item.dataset.id, item.dataset.parent);
+        }
+        return;
+      }
+
+      if (grid && e.target === grid && grid.dataset.group) {
+        const dragged = links.find(l => l._id === draggedId);
+        if (!dragged) return;
+        dragged.parent = grid.dataset.group;
+        dragged.order = getLinksForGroup(grid.dataset.group).length;
+        saveData();
+        render();
+      }
+    });
+  }
+
+  function bindLongPressEditMode() {
     let longPressTimer = null;
     let longPressStartX = 0;
     let longPressStartY = 0;
     let longPressTarget = null;
+    let longPressTouch = null;
+    let longPressConsumed = false;
+
+    document.addEventListener('click', e => {
+      if (!longPressConsumed) return;
+      const linkEl = e.target.closest('.link-item');
+      if (!linkEl) return;
+      e.preventDefault();
+      e.stopPropagation();
+      longPressConsumed = false;
+    }, true);
 
     document.addEventListener('touchstart', e => {
       if (e.touches.length !== 1) return;
       const target = e.target;
-      if (target.closest('.modal') || target.closest('.settings-modal') || target.closest('#context-menu')) return;
+      if (target.closest('.modal') || target.closest('.settings-modal')) return;
 
       const touch = e.touches[0];
       longPressStartX = touch.clientX;
       longPressStartY = touch.clientY;
       longPressTarget = target;
+      longPressTouch = { pageX: touch.pageX, pageY: touch.pageY };
       clearTimeout(longPressTimer);
       longPressTimer = setTimeout(() => {
         const linkEl = longPressTarget?.closest('.link-item');
         if (linkEl) {
-          showContextMenu({
-            x: touch.pageX,
-            y: touch.pageY,
-            mode: 'link',
-            linkId: linkEl.dataset.id,
-            groupName: linkEl.dataset.parent
-          });
+          if (IS_TOUCH_DEVICE) {
+            longPressConsumed = true;
+            enterEditMode();
+            return;
+          }
+          enterEditMode();
           return;
         }
 
         const groupEl = longPressTarget?.closest('.group-context-target');
         if (groupEl) {
-          showContextMenu({
-            x: touch.pageX,
-            y: touch.pageY,
-            mode: 'group',
-            groupName: groupEl.dataset.groupName || selectedGroup
-          });
+          if (IS_TOUCH_DEVICE) {
+            longPressConsumed = true;
+            enterEditMode();
+            return;
+          }
+          enterEditMode();
           return;
         }
 
         if (longPressTarget?.closest('#main-container')) {
-          showContextMenu({
-            x: touch.pageX,
-            y: touch.pageY,
-            mode: 'general',
-            groupName: selectedGroup
-          });
+          longPressConsumed = true;
+          enterEditMode();
         }
-      }, 480);
+      }, IS_TOUCH_DEVICE ? 380 : 480);
     }, { passive: true });
 
     document.addEventListener('touchmove', e => {
@@ -711,29 +603,25 @@ import {
       clearTimeout(longPressTimer);
       longPressTimer = null;
       longPressTarget = null;
+      longPressTouch = null;
+      if (!IS_TOUCH_DEVICE) {
+        longPressConsumed = false;
+      } else {
+        setTimeout(() => {
+          longPressConsumed = false;
+        }, 450);
+      }
     };
     document.addEventListener('touchend', clearLongPress, { passive: true });
     document.addEventListener('touchcancel', clearLongPress, { passive: true });
-
-    contextMenu.addEventListener('click', e => {
-      const btn = e.target.closest('button[data-action]');
-      if (!btn) return;
-      handleMenuAction(btn.dataset.action);
-      hideContextMenu();
-    });
-
-    document.addEventListener('click', e => {
-      if (!e.target.closest('#context-menu')) hideContextMenu();
-    });
-
-    window.addEventListener('resize', hideContextMenu);
-    window.addEventListener('scroll', hideContextMenu, { passive: true });
   }
 
   /* ========== MODAL ========== */
   function openModal(mode, link = null, defaultGroup = null) {
     modalMode = mode;
     modalOverlay.classList.remove('hidden');
+    modalPin.classList.add('hidden');
+    modalDelete.classList.add('hidden');
 
     if (mode === 'add-group') {
       modalTitle.textContent = 'Thêm nhóm';
@@ -747,6 +635,9 @@ import {
       modalBodyGroup.classList.remove('hidden');
       inputGroupName.value = link; // reusing link param for group name
       editingGroupName = link;
+      modalPin.textContent = groups.pinned.includes(link) ? 'Bỏ ghim' : 'Ghim';
+      modalPin.classList.remove('hidden');
+      modalDelete.classList.remove('hidden');
       inputGroupName.focus();
     } else {
       modalBodyLink.classList.remove('hidden');
@@ -767,6 +658,7 @@ import {
         inputName.value = link.title;
         inputGroup.value = link.parent;
         editingLinkId = link._id;
+        modalDelete.classList.remove('hidden');
       } else {
         modalTitle.textContent = 'Thêm liên kết';
         inputUrl.value = '';
@@ -786,6 +678,26 @@ import {
   }
 
   modalCancel.addEventListener('click', closeModal);
+  modalPin.addEventListener('click', () => {
+    if (modalMode !== 'edit-group' || !editingGroupName) return;
+    const groupName = editingGroupName;
+    closeModal();
+    togglePinGroup(groupName);
+  });
+  modalDelete.addEventListener('click', () => {
+    if (modalMode === 'edit-link' && editingLinkId) {
+      const targetId = editingLinkId;
+      closeModal();
+      deleteLink(targetId);
+      return;
+    }
+
+    if (modalMode === 'edit-group' && editingGroupName) {
+      const groupName = editingGroupName;
+      closeModal();
+      deleteGroup(groupName);
+    }
+  });
   modalOverlay.addEventListener('click', e => {
     if (e.target === modalOverlay) closeModal();
   });
@@ -878,6 +790,14 @@ import {
   });
 
   /* ========== SETTINGS PANEL ========== */
+  editModeBtn.addEventListener('click', () => {
+    if (isEditMode) {
+      exitEditMode();
+      return;
+    }
+    enterEditMode();
+  });
+
   settingsBtn.addEventListener('click', openSettings);
 
   function openSettings() {
@@ -1101,37 +1021,31 @@ import {
     if (e.key === 'Escape') {
       closeModal();
       closeSettings();
-      hideContextMenu();
-    }
-  });
-
-  /* ========== SELECTED GRID DROP ZONE (registered once) ========== */
-  selectedGrid.addEventListener('dragover', e => { e.preventDefault(); });
-  selectedGrid.addEventListener('drop', e => {
-    if (e.target !== selectedGrid) return;
-    const draggedId = e.dataTransfer.getData('text/plain');
-    if (draggedId) {
-      const dragged = links.find(l => l._id === draggedId);
-      if (dragged) {
-        dragged.parent = selectedGroup;
-        dragged.order = getLinksForGroup(selectedGroup).length;
-        saveData();
-        render();
-      }
+      exitEditMode();
     }
   });
 
   /* ========== AUTO-REFRESH ON EXTERNAL CHANGES ========== */
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.links) {
-      links = changes.links.newValue || [];
+    if (area === 'local' && suppressStorageSync) return;
+    if (area === 'local' && (changes.links || changes.groups || changes.settings)) {
+      if (changes.links) links = changes.links.newValue || [];
+      if (changes.groups) {
+        groups = changes.groups.newValue || groups;
+        selectedGroup = groups.selected || selectedGroup;
+      }
+      if (changes.settings) {
+        settings = Object.assign({}, DEFAULT_SETTINGS, changes.settings.newValue || {});
+      }
       render();
     }
   });
 
   /* ========== INIT ========== */
   bindGistCredentialInputs(dom);
-  bindContextMenu();
+  bindGridInteractions();
+  bindLongPressEditMode();
+  setEditMode(false);
   Promise.all([loadData(), loadFaviconCache()]).then(() => {
     render();
     requestAnimationFrame(() => {
