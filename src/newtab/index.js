@@ -122,6 +122,14 @@ import {
       .sort((a, b) => a.order - b.order);
   }
 
+  function normalizeGroupOrders(...groupNames) {
+    [...new Set(groupNames.filter(Boolean))].forEach(groupName => {
+      getLinksForGroup(groupName).forEach((link, index) => {
+        link.order = index;
+      });
+    });
+  }
+
   function setQuickActionStatus(message, type = '') {
     if (!quickActionStatus) return;
     quickActionStatus.textContent = message;
@@ -274,6 +282,7 @@ import {
     const dragged = links.find(l => l._id === draggedId);
     const target = links.find(l => l._id === targetId);
     if (!dragged || !target) return;
+    const sourceGroup = dragged.parent;
 
     // Move dragged to target group
     dragged.parent = targetGroup || target.parent;
@@ -289,6 +298,7 @@ import {
     }
 
     filtered.forEach((l, i) => l.order = i);
+    normalizeGroupOrders(sourceGroup, dragged.parent);
 
     saveData();
     render();
@@ -352,6 +362,7 @@ import {
 
     // Selected group
     selectedGrid.innerHTML = '';
+    selectedGrid.dataset.group = selectedGroup || '';
     const selectedGroupLinks = getLinksForGroup(selectedGroup);
     selectedGroupLinks.forEach(l => {
       selectedGrid.appendChild(createLinkEl(l));
@@ -438,13 +449,6 @@ import {
         return;
       }
 
-      const groupTarget = e.target.closest('.group-context-target');
-      if (groupTarget && isEditMode) {
-        e.preventDefault();
-        openGroupEditor(groupTarget.dataset.groupName || selectedGroup);
-        return;
-      }
-
       const tab = e.target.closest('#group-tabs .tab');
       if (tab) {
         if (tab.dataset.action === 'add-group') {
@@ -453,13 +457,27 @@ import {
           openModal('add-group');
           return;
         }
-        if (isEditMode) return;
         selectedGroup = tab.dataset.groupName;
         groups.selected = selectedGroup;
         saveData();
         render();
         return;
       }
+
+      const groupTarget = e.target.closest('.group-context-target');
+      if (groupTarget && isEditMode) {
+        e.preventDefault();
+        openGroupEditor(groupTarget.dataset.groupName || selectedGroup);
+        return;
+      }
+    });
+
+    document.addEventListener('contextmenu', e => {
+      if (!isEditMode) return;
+      const groupTarget = e.target.closest('.group-context-target');
+      if (!groupTarget) return;
+      e.preventDefault();
+      openGroupEditor(groupTarget.dataset.groupName || selectedGroup);
     });
 
     document.addEventListener('dragstart', e => {
@@ -522,8 +540,12 @@ import {
       if (grid && e.target === grid && grid.dataset.group) {
         const dragged = links.find(l => l._id === draggedId);
         if (!dragged) return;
-        dragged.parent = grid.dataset.group;
-        dragged.order = getLinksForGroup(grid.dataset.group).length;
+        const sourceGroup = dragged.parent;
+        const targetGroup = grid.dataset.group;
+        const targetLinks = getLinksForGroup(targetGroup).filter(l => l._id !== draggedId);
+        dragged.parent = targetGroup;
+        dragged.order = targetLinks.length;
+        normalizeGroupOrders(sourceGroup, targetGroup);
         saveData();
         render();
       }
@@ -742,9 +764,11 @@ import {
     if (editingLinkId) {
       const link = links.find(l => l._id === editingLinkId);
       if (link) {
+        const previousGroup = link.parent;
         link.url = url;
         link.title = title;
         link.parent = group;
+        normalizeGroupOrders(previousGroup, group);
       }
     } else {
       const groupLinks = getLinksForGroup(group);
@@ -763,9 +787,14 @@ import {
     render();
   });
 
-  // Enter key saves
-  [inputUrl, inputName, inputGroupName].forEach(el => {
-    el.addEventListener('keydown', e => { if (e.key === 'Enter') modalSave.click(); });
+  // Keep modal inputs isolated from page-level shortcuts and only submit on a real Enter.
+  [inputUrl, inputName, inputGroupName, inputGroup].forEach(el => {
+    el.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      modalSave.click();
+    });
   });
 
   // Auto-fill name when URL blurs
