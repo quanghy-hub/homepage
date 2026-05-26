@@ -238,6 +238,30 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     render();
   }
 
+  function reorderGroup(draggedName, targetName) {
+    const draggedIdx = groups.list.indexOf(draggedName);
+    const targetIdx = groups.list.indexOf(targetName);
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    groups.list.splice(draggedIdx, 1);
+    groups.list.splice(targetIdx, 0, draggedName);
+
+    saveData();
+    render();
+  }
+
+  function reorderPinnedGroup(draggedName, targetName) {
+    const draggedIdx = groups.pinned.indexOf(draggedName);
+    const targetIdx = groups.pinned.indexOf(targetName);
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    groups.pinned.splice(draggedIdx, 1);
+    groups.pinned.splice(targetIdx, 0, draggedName);
+
+    saveData();
+    render();
+  }
+
   /* ========== RENDER ========== */
   function render() {
     homeRenderer.render();
@@ -266,7 +290,7 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
 
   function deleteGroup(groupName) {
     if (!groupName || groups.list.length <= 2) return;
-    if (!confirm(`Xoá nhóm "${groupName}"? Các link trong nhóm cũng sẽ bị xoá.`)) return;
+    if (!confirm(`Delete group "${groupName}"? All links in this group will also be deleted.`)) return;
 
     groups.list = groups.list.filter(x => x !== groupName);
     groups.pinned = groups.pinned.filter(x => x !== groupName);
@@ -376,12 +400,12 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     chrome.storage.local.get([STORAGE_KEYS.recentPage], result => {
       const recent = result[STORAGE_KEYS.recentPage];
       if (!recent || !isNormalUrl(recent.url)) {
-        setQuickActionStatus('Chưa có trang gần nhất để thêm. Hãy mở web rồi quay lại.', 'err');
+        setQuickActionStatus('No recent page to add. Please open a website first, then return.', 'err');
         modalController.fillAddLinkModal('', '', selectedGroup);
         return;
       }
 
-      setQuickActionStatus(`Đã lấy: ${recent.title || recent.url}`, 'ok');
+      setQuickActionStatus(`Retrieved: ${recent.title || recent.url}`, 'ok');
       modalController.fillAddLinkModal(recent.url, recent.title || autoTitle(recent.url), selectedGroup);
     });
   });
@@ -497,6 +521,8 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     normalizeGroupOrders,
     render,
     reorderLink,
+    reorderGroup,
+    reorderPinnedGroup,
     saveData
   });
   bindEditModeActivation({

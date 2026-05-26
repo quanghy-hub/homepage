@@ -47,7 +47,7 @@ export function createSyncController({
   }
 
   async function pullFromCloudflare(showStatus = true) {
-    if (showStatus) setSyncStatus('Đang kéo về...');
+    if (showStatus) setSyncStatus('Pulling from cloud...');
 
     const imported = await pullCloudflareState(dom);
     applyRemoteState(imported);
@@ -58,17 +58,17 @@ export function createSyncController({
     refreshSettingsControls();
 
     if (showStatus) {
-      setSyncStatus('✓ Kéo về thành công · ' + new Date().toLocaleTimeString(), 'ok');
+      setSyncStatus('✓ Pulled successfully · ' + new Date().toLocaleTimeString(), 'ok');
     }
   }
 
   async function pushToCloudflare(showStatus = true) {
     if (!syncReady) {
-      throw new Error('Máy này chưa kéo cloud về lần đầu. Hãy bấm Kéo về trước để tránh ghi đè dữ liệu.');
+      throw new Error('This device has not pulled from the cloud yet. Please Pull from Cloud first to avoid overwriting remote data.');
     }
 
     persistCurrentProfile();
-    if (showStatus) setSyncStatus('Đang đẩy lên...');
+    if (showStatus) setSyncStatus('Pushing to cloud...');
 
     const updated = await pushCloudflareState(dom, getState(), getRevision());
     applyRemoteState(updated);
@@ -76,7 +76,7 @@ export function createSyncController({
     refreshSettingsControls();
 
     if (showStatus) {
-      setSyncStatus('✓ Đẩy thành công · ' + new Date().toLocaleTimeString(), 'ok');
+      setSyncStatus('✓ Pushed successfully · ' + new Date().toLocaleTimeString(), 'ok');
     }
   }
 
@@ -86,16 +86,16 @@ export function createSyncController({
     if (!config.workerUrl || !config.apiCode) return;
     if (config.syncMode !== 'auto') return;
     if (!syncReady || !Number.isSafeInteger(getRevision())) {
-      setSyncStatus('Auto sync đang chờ bạn Kéo về lần đầu.', '');
+      setSyncStatus('Auto sync is waiting for your initial Pull from Cloud.', '');
       return;
     }
 
     autoSyncTimer = setTimeout(async () => {
       try {
         await pushToCloudflare(false);
-        setSyncStatus('✓ Tự đồng bộ · ' + new Date().toLocaleTimeString(), 'ok');
+        setSyncStatus('✓ Auto synced · ' + new Date().toLocaleTimeString(), 'ok');
       } catch (err) {
-        setSyncStatus('✗ Tự đồng bộ lỗi: ' + err.message, 'err');
+        setSyncStatus('✗ Auto sync error: ' + err.message, 'err');
       }
     }, AUTO_SYNC_DELAY);
   }
@@ -105,13 +105,13 @@ export function createSyncController({
       onProfileChange: switchProfile,
       onConfigChange: () => {
         syncReady = false;
-        setSyncStatus('Đã đổi cấu hình sync. Hãy Kéo về một lần trước khi auto-sync.', '');
+        setSyncStatus('Sync configuration updated. Please Pull from Cloud once before auto-sync.', '');
       },
       onModeChange: syncMode => {
         if (syncMode === 'auto' && !syncReady) {
-          setSyncStatus('Auto sync sẽ bật sau khi Kéo về thành công lần đầu.', '');
+          setSyncStatus('Auto sync will be enabled after a successful initial Pull.', '');
         } else if (syncMode === 'manual') {
-          setSyncStatus('Đang ở chế độ thủ công: dùng Đẩy lên / Kéo về.', '');
+          setSyncStatus('Manual mode enabled: Use Push / Pull to sync.', '');
         }
       }
     });
@@ -119,16 +119,16 @@ export function createSyncController({
     dom.verifySyncBtn.addEventListener('click', async () => {
       try {
         dom.verifySyncBtn.disabled = true;
-        setVerifyStatus('Đang kiểm tra kết nối...');
+        setVerifyStatus('Testing connection...');
 
         const remote = await verifyCloudflareSync(dom);
         if (Number.isSafeInteger(remote.revision)) {
           setRevision(remote.revision);
           saveSyncRevision(remote.revision);
         }
-        setVerifyStatus('✓ Kết nối được Worker', 'ok');
+        setVerifyStatus('✓ Connected to Worker successfully', 'ok');
       } catch (err) {
-        setVerifyStatus('✗ Không kết nối được · ' + err.message, 'err');
+        setVerifyStatus('✗ Connection failed · ' + err.message, 'err');
       } finally {
         dom.verifySyncBtn.disabled = false;
       }
@@ -139,7 +139,7 @@ export function createSyncController({
       try {
         await pushToCloudflare(true);
       } catch (err) {
-        setSyncStatus('✗ Lỗi: ' + err.message, 'err');
+        setSyncStatus('✗ Error: ' + err.message, 'err');
       } finally {
         dom.syncPush.disabled = false;
       }
@@ -150,7 +150,7 @@ export function createSyncController({
       try {
         await pullFromCloudflare(true);
       } catch (err) {
-        setSyncStatus('✗ Lỗi: ' + err.message, 'err');
+        setSyncStatus('✗ Error: ' + err.message, 'err');
       } finally {
         dom.syncPull.disabled = false;
       }

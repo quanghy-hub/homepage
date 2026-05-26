@@ -1,4 +1,15 @@
 export function getDomRefs() {
+    const getRadioVal = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value || '';
+    const setRadioVal = (name, val) => {
+        const el = document.querySelector(`input[name="${name}"][value="${val}"]`);
+        if (el) el.checked = true;
+    };
+    const addRadioListener = (name, event, cb) => {
+        document.querySelectorAll(`input[name="${name}"]`).forEach(el => {
+            el.addEventListener(event, cb);
+        });
+    };
+
     return {
         quickActions: document.getElementById('quick-actions'),
         addCurrentBtn: document.getElementById('add-current-btn'),
@@ -26,8 +37,16 @@ export function getDomRefs() {
         settingsClose: document.getElementById('settings-close'),
         syncWorkerUrlInput: document.getElementById('setting-sync-worker-url'),
         syncApiCodeInput: document.getElementById('setting-sync-api-code'),
-        syncProfileSelect: document.getElementById('setting-sync-profile'),
-        syncModeSelect: document.getElementById('setting-sync-mode'),
+        syncProfileSelect: {
+            get value() { return getRadioVal('sync-profile'); },
+            set value(val) { setRadioVal('sync-profile', val); },
+            addEventListener(event, cb) { addRadioListener('sync-profile', event, cb); }
+        },
+        syncModeSelect: {
+            get value() { return getRadioVal('sync-mode'); },
+            set value(val) { setRadioVal('sync-mode', val); },
+            addEventListener(event, cb) { addRadioListener('sync-mode', event, cb); }
+        },
         verifySyncBtn: document.getElementById('verify-sync'),
         syncVerifyStatus: document.getElementById('sync-verify-status'),
         syncPush: document.getElementById('sync-push'),

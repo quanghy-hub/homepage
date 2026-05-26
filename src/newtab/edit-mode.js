@@ -20,13 +20,14 @@ export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode
 
         longPressConsumed = true;
         if (isEditMode()) {
-            exitEditMode();
+            return; // Disable exiting via long press
         } else {
             enterEditMode();
         }
     }
 
     function startLongPress(target, clientX, clientY, delay) {
+        if (isEditMode()) return; // Disable long press detection in edit mode
         if (!canStartLongPress(target)) return;
         longPressStartX = clientX;
         longPressStartY = clientY;
@@ -59,9 +60,45 @@ export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode
         }, 0);
     }, true);
 
+    // Mouse double-click to exit/save edit mode
+    document.addEventListener('dblclick', e => {
+        if (!isEditMode()) return;
+        if (e.button !== 0) return; // Only left click
+        if (!canStartLongPress(e.target) || e.target.closest('.modal-overlay')) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        exitEditMode();
+    }, true);
+
+    let lastTouchTime = 0;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+
     document.addEventListener('touchstart', e => {
         if (e.touches.length !== 1) return;
         const touch = e.touches[0];
+
+        if (isEditMode()) {
+            const now = Date.now();
+            const dt = now - lastTouchTime;
+            const dx = Math.abs(touch.clientX - lastTouchX);
+            const dy = Math.abs(touch.clientY - lastTouchY);
+
+            if (dt < 300 && dx < 15 && dy < 15) {
+                if (canStartLongPress(e.target) && !e.target.closest('.modal-overlay')) {
+                    exitEditMode();
+                    lastTouchTime = 0;
+                    return;
+                }
+            }
+
+            lastTouchTime = now;
+            lastTouchX = touch.clientX;
+            lastTouchY = touch.clientY;
+            return;
+        }
+
         startLongPress(e.target, touch.clientX, touch.clientY, isTouchDevice ? 380 : 480);
     }, { passive: true });
 

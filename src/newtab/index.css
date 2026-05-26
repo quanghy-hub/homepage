@@ -339,6 +339,34 @@ body.edit-mode .group-context-target {
   position: relative;
 }
 
+body.edit-mode #group-tabs .tab:not(.tab-add-group),
+body.edit-mode .pinned-group-header {
+  cursor: grab;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease, color 0.2s ease;
+}
+
+body.edit-mode #group-tabs .tab:not(.tab-add-group):active,
+body.edit-mode .pinned-group-header:active {
+  cursor: grabbing;
+}
+
+/* Drag states for groups */
+#group-tabs .tab.dragging-group,
+.pinned-group-header.dragging-group-header {
+  opacity: 0.4;
+  transform: scale(0.95);
+  border: 1px dashed #58a6ff !important;
+}
+
+#group-tabs .tab.drag-over,
+.pinned-group-header.drag-over {
+  background: rgba(88, 166, 255, 0.15) !important;
+  border-color: #58a6ff !important;
+  color: #fff !important;
+  transform: scale(1.08);
+}
+
+
 .tab-add-group {
   padding: 5px 12px !important;
   border-radius: 16px;
@@ -837,3 +865,48 @@ body.edit-mode .group-context-target {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
 }
+
+/* ===== Segmented Control ===== */
+.segmented-control {
+  display: flex;
+  background: #0d1117;
+  border-radius: 8px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 5px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.segment-option {
+  flex: 1;
+  text-align: center;
+  margin-bottom: 0 !important;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.segment-option input[type="radio"] {
+  display: none !important;
+}
+
+.segment-option span {
+  display: block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #8b949e;
+  transition: all 0.15s ease;
+}
+
+.segment-option input[type="radio"]:checked + span {
+  background: #1f6feb;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(31, 111, 235, 0.28);
+}
+
+.segment-option:hover span {
+  color: #e6edf3;
+}
+

@@ -52,7 +52,7 @@
   </div>
 
   <!-- Settings Button -->
-  <button id="settings-btn" title="Cài đặt">
+  <button id="settings-btn" title="Settings">
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5" />
       <path
@@ -64,28 +64,28 @@
   <!-- Modal: Add / Edit Link -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div class="modal">
-      <h3 id="modal-title">Thêm liên kết</h3>
+      <h3 id="modal-title">Add Link</h3>
       <div id="modal-body-link">
         <label>URL
           <input type="url" id="input-url" placeholder="https://example.com" autocomplete="off">
         </label>
-        <label>Tên (tự động nếu bỏ trống)
-          <input type="text" id="input-name" placeholder="Tên hiển thị" autocomplete="off">
+        <label>Title (automatic if empty)
+          <input type="text" id="input-name" placeholder="Display Title" autocomplete="off">
         </label>
-        <label>Nhóm
+        <label>Group
           <select id="input-group"></select>
         </label>
       </div>
       <div id="modal-body-group" class="hidden">
-        <label>Tên nhóm
-          <input type="text" id="input-group-name" placeholder="Tên nhóm mới" autocomplete="off">
+        <label>Group Name
+          <input type="text" id="input-group-name" placeholder="New Group Name" autocomplete="off">
         </label>
       </div>
       <div class="modal-actions">
-        <button id="modal-pin" class="secondary-btn hidden">Ghim</button>
-        <button id="modal-delete" class="danger-btn hidden">Xoá</button>
-        <button id="modal-cancel">Huỷ</button>
-        <button id="modal-save">Lưu</button>
+        <button id="modal-pin" class="secondary-btn hidden">Pin</button>
+        <button id="modal-delete" class="danger-btn hidden">Delete</button>
+        <button id="modal-cancel">Cancel</button>
+        <button id="modal-save">Save</button>
       </div>
     </div>
   </div>
@@ -93,10 +93,10 @@
   <!-- Settings Panel -->
   <div id="settings-overlay" class="modal-overlay hidden">
     <div class="modal settings-modal">
-      <h3>Cài đặt</h3>
+      <h3>Settings</h3>
 
       <div class="settings-slider-row">
-        <span class="settings-slider-label">icon</span>
+        <span class="settings-slider-label">Icon Size</span>
         <span id="setting-icon-size-val">56px</span>
         <input type="range" id="setting-icon-size" min="32" max="80" value="56" step="2">
       </div>
@@ -104,7 +104,7 @@
       <div class="settings-section">
         <div class="settings-inline-row">
           <h4>Favicon Cache</h4>
-          <button id="cleanup-favicons" class="icon-action-btn" title="Dọn icon cũ">🗑</button>
+          <button id="cleanup-favicons" class="icon-action-btn" title="Clear Cached Favicons">🗑</button>
         </div>
       </div>
 
@@ -113,33 +113,43 @@
         <label>Worker URL
           <input type="url" id="setting-sync-worker-url" placeholder="https://extension.your-subdomain.workers.dev" autocomplete="off">
         </label>
-        <label>API code</label>
+        <label>API Code</label>
         <div class="token-row">
-          <input type="password" id="setting-sync-api-code" placeholder="Mã API đã đặt trong SYNC_API_KEY" autocomplete="off">
-          <button id="verify-sync" class="icon-action-btn" title="Kiểm tra kết nối">✓</button>
+          <input type="password" id="setting-sync-api-code" placeholder="API Code configured in SYNC_API_KEY" autocomplete="off">
+          <button id="verify-sync" class="icon-action-btn" title="Test Connection">✓</button>
         </div>
-        <label>Profile
-          <select id="setting-sync-profile">
-            <option value="macbook">MacBook</option>
-            <option value="mobile">Mobile</option>
-          </select>
-        </label>
-        <label>Chế độ
-          <select id="setting-sync-mode">
-            <option value="manual">Thủ công</option>
-            <option value="auto">Auto sync</option>
-          </select>
-        </label>
+        <label>Profile</label>
+        <div class="segmented-control">
+          <label class="segment-option">
+            <input type="radio" name="sync-profile" value="macbook" checked>
+            <span>MacBook</span>
+          </label>
+          <label class="segment-option">
+            <input type="radio" name="sync-profile" value="mobile">
+            <span>Mobile</span>
+          </label>
+        </div>
+        <label>Sync Mode</label>
+        <div class="segmented-control">
+          <label class="segment-option">
+            <input type="radio" name="sync-mode" value="manual" checked>
+            <span>Manual</span>
+          </label>
+          <label class="segment-option">
+            <input type="radio" name="sync-mode" value="auto">
+            <span>Auto Sync</span>
+          </label>
+        </div>
         <div class="sync-actions">
-          <button id="sync-push" class="btn-sync">⬆ Đẩy lên</button>
-          <button id="sync-pull" class="btn-sync">⬇ Kéo về</button>
+          <button id="sync-push" class="btn-sync">⬆ Push to Cloud</button>
+          <button id="sync-pull" class="btn-sync">⬇ Pull from Cloud</button>
         </div>
         <div id="sync-verify-status" class="sync-status"></div>
         <div id="sync-status" class="sync-status"></div>
       </div>
 
       <div class="modal-actions">
-        <button id="settings-close">Đóng</button>
+        <button id="settings-close">Close</button>
       </div>
     </div>
   </div>

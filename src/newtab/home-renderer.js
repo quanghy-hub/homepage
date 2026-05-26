@@ -156,6 +156,7 @@ export function createHomeRenderer({
       header.textContent = groupName;
       header.dataset.groupName = groupName;
       header.classList.add('group-context-target');
+      header.draggable = isEditMode();
 
       dom.pinnedGrid.appendChild(grid);
 
@@ -177,6 +178,7 @@ export function createHomeRenderer({
       tab.textContent = groupName;
       tab.dataset.groupName = groupName;
       tab.classList.add('group-context-target');
+      tab.draggable = isEditMode();
       dom.groupTabs.appendChild(tab);
     });
 

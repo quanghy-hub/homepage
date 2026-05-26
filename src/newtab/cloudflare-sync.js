@@ -49,8 +49,8 @@ function buildConfiguredSync(dom) {
     const endpoint = getStateEndpoint(config.workerUrl);
     const headers = getSyncHeaders(config.apiCode);
 
-    if (!config.workerUrl) throw new Error('Nhập Worker URL trước');
-    if (!headers) throw new Error('Nhập API code trước');
+    if (!config.workerUrl) throw new Error('Please enter Worker URL first');
+    if (!headers) throw new Error('Please enter API code first');
 
     return { ...config, endpoint, headers };
 }
@@ -186,7 +186,7 @@ export async function pushCloudflareState(dom, state, baseRevision = null) {
     });
 
     if (res.status === 409) {
-        throw new Error('Cloud đã có dữ liệu mới hơn. Hãy kéo về rồi kiểm tra lại trước khi đẩy.');
+        throw new Error('Cloud has newer data. Please Pull from Cloud first to check and avoid conflicts.');
     }
 
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);

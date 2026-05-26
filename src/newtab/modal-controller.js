@@ -42,18 +42,18 @@ export function createModalController({
     modalDelete.classList.add('hidden');
 
     if (mode === 'add-group') {
-      modalTitle.textContent = 'Thêm nhóm';
+      modalTitle.textContent = 'Add Group';
       modalBodyLink.classList.add('hidden');
       modalBodyGroup.classList.remove('hidden');
       inputGroupName.value = '';
       inputGroupName.focus();
     } else if (mode === 'edit-group') {
-      modalTitle.textContent = 'Đổi tên nhóm';
+      modalTitle.textContent = 'Rename Group';
       modalBodyLink.classList.add('hidden');
       modalBodyGroup.classList.remove('hidden');
       inputGroupName.value = link;
       editingGroupName = link;
-      modalPin.textContent = groups.pinned.includes(link) ? 'Bỏ ghim' : 'Ghim';
+      modalPin.textContent = groups.pinned.includes(link) ? 'Unpin' : 'Pin';
       modalPin.classList.remove('hidden');
       modalDelete.classList.remove('hidden');
       inputGroupName.focus();
@@ -70,14 +70,14 @@ export function createModalController({
       });
 
       if (mode === 'edit-link' && link) {
-        modalTitle.textContent = 'Sửa liên kết';
+        modalTitle.textContent = 'Edit Link';
         inputUrl.value = link.url;
         inputName.value = link.title;
         inputGroup.value = link.parent;
         editingLinkId = link._id;
         modalDelete.classList.remove('hidden');
       } else {
-        modalTitle.textContent = 'Thêm liên kết';
+        modalTitle.textContent = 'Add Link';
         inputUrl.value = '';
         inputName.value = '';
         inputGroup.value = defaultGroup || getSelectedGroup();
