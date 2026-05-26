@@ -2,8 +2,13 @@ export const STORAGE_KEYS = {
     links: 'links',
     groups: 'groups',
     settings: 'settings',
-    gistToken: 'gistToken',
-    gistId: 'gistId',
+    profiles: 'profiles',
+    syncWorkerUrl: 'syncWorkerUrl',
+    syncApiCode: 'syncApiCode',
+    syncProfile: 'syncProfile',
+    syncMode: 'syncMode',
+    syncReady: 'syncReady',
+    syncRevision: 'syncRevision',
     recentPage: 'recentPage',
     faviconCache: 'faviconCache'
 };

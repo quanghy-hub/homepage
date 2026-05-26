@@ -4,6 +4,25 @@ export const DEFAULT_GROUPS = {
     selected: '☓ '
 };
 
+export const DEFAULT_PROFILE_ID = 'macbook';
+
+export const DEFAULT_PROFILES = {
+    macbook: {
+        pinned: ['A'],
+        selected: '☓ ',
+        settings: {
+            iconSize: 56
+        }
+    },
+    mobile: {
+        pinned: ['A'],
+        selected: '☓ ',
+        settings: {
+            iconSize: 52
+        }
+    }
+};
+
 export const DEFAULT_LINKS = [
     { _id: 'linksirdilh', order: 0, parent: 'A', title: 'Alpha123', url: 'https://alpha123.uk/' },
     { _id: 'linkspjqank', order: 1, parent: 'A', title: 'Phần mềm', url: 'https://voz.vn/f/phan-mem.13/' },

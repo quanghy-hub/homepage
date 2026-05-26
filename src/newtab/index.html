@@ -52,12 +52,6 @@
   </div>
 
   <!-- Settings Button -->
-  <button id="edit-mode-btn" title="Chỉnh sửa" aria-label="Chỉnh sửa">
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path d="M13.8 3.8a1.7 1.7 0 112.4 2.4l-8.8 8.8-3.2.8.8-3.2 8.8-8.8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-      <path d="M11.7 5.9l2.4 2.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-    </svg>
-  </button>
   <button id="settings-btn" title="Cài đặt">
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5" />
@@ -115,17 +109,32 @@
       </div>
 
       <div class="settings-section">
-        <h4>Đồng bộ GitHub Gist</h4>
-        <label>GitHub Token</label>
+        <h4>Cloudflare Sync</h4>
+        <label>Worker URL
+          <input type="url" id="setting-sync-worker-url" placeholder="https://extension.your-subdomain.workers.dev" autocomplete="off">
+        </label>
+        <label>API code</label>
         <div class="token-row">
-          <input type="text" id="setting-gist-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
-          <button id="verify-gist-token" class="icon-action-btn" title="Kiểm tra token">✓</button>
+          <input type="password" id="setting-sync-api-code" placeholder="Mã API đã đặt trong SYNC_API_KEY" autocomplete="off">
+          <button id="verify-sync" class="icon-action-btn" title="Kiểm tra kết nối">✓</button>
         </div>
+        <label>Profile
+          <select id="setting-sync-profile">
+            <option value="macbook">MacBook</option>
+            <option value="mobile">Mobile</option>
+          </select>
+        </label>
+        <label>Chế độ
+          <select id="setting-sync-mode">
+            <option value="manual">Thủ công</option>
+            <option value="auto">Auto sync</option>
+          </select>
+        </label>
         <div class="sync-actions">
           <button id="sync-push" class="btn-sync">⬆ Đẩy lên</button>
           <button id="sync-pull" class="btn-sync">⬇ Kéo về</button>
         </div>
-        <div id="gist-verify-status" class="sync-status"></div>
+        <div id="sync-verify-status" class="sync-status"></div>
         <div id="sync-status" class="sync-status"></div>
       </div>
 
