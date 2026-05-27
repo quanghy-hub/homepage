@@ -145,12 +145,12 @@ export function buildExportData(state, baseRevision = null) {
         baseRevision,
         links: state.links,
         groups: {
-            list: state.groups.list
-        },
-        profile: {
-            settings: state.settings,
+            list: state.groups.list,
             pinned: state.groups.pinned,
             selected: state.groups.selected
+        },
+        profile: {
+            settings: state.settings
         }
     };
 }

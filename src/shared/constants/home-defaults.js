@@ -8,15 +8,11 @@ export const DEFAULT_PROFILE_ID = 'macbook';
 
 export const DEFAULT_PROFILES = {
     macbook: {
-        pinned: ['A'],
-        selected: '☓ ',
         settings: {
             iconSize: 56
         }
     },
     mobile: {
-        pinned: ['A'],
-        selected: '☓ ',
         settings: {
             iconSize: 52
         }

@@ -14,24 +14,15 @@ function normalizeSelected(value, list, pinned) {
 }
 
 export function normalizeProfile(profile, fallbackGroups = DEFAULT_GROUPS, fallbackSettings = DEFAULT_SETTINGS) {
-    const list = Array.isArray(fallbackGroups.list) ? fallbackGroups.list : DEFAULT_GROUPS.list;
-    const fallbackPinned = normalizePinned(fallbackGroups.pinned);
     const source = profile && typeof profile === 'object' ? profile : {};
-    const pinned = normalizePinned(source.pinned || fallbackPinned).filter(g => list.includes(g));
-    const defaultPinned = normalizePinned(DEFAULT_GROUPS.pinned).filter(g => list.includes(g));
-    const safePinned = pinned.length ? pinned : (defaultPinned.length ? defaultPinned : [list[0]].filter(Boolean));
 
     return {
-        pinned: safePinned,
-        selected: normalizeSelected(source.selected || fallbackGroups.selected, list, safePinned),
         settings: Object.assign({}, DEFAULT_SETTINGS, fallbackSettings || {}, source.settings || {})
     };
 }
 
 export function getProfileFromState(state) {
     return normalizeProfile({
-        pinned: state.groups?.pinned,
-        selected: state.groups?.selected,
         settings: state.settings
     }, state.groups, state.settings);
 }
@@ -68,10 +59,13 @@ export function loadAppData(state) {
                 state.settings
             );
             state.profiles[state.profileId] = activeProfile;
-            state.groups.pinned = activeProfile.pinned;
-            state.groups.selected = activeProfile.selected;
+            state.groups.pinned = normalizePinned(state.groups.pinned).filter(g => state.groups.list.includes(g));
+            if (!state.groups.pinned.length) {
+                state.groups.pinned = deepClone(DEFAULT_GROUPS.pinned).filter(g => state.groups.list.includes(g));
+            }
+            state.groups.selected = normalizeSelected(state.groups.selected, state.groups.list, state.groups.pinned);
             state.settings = activeProfile.settings;
-            state.selectedGroup = activeProfile.selected;
+            state.selectedGroup = state.groups.selected;
             resolve();
         });
     });

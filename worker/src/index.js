@@ -74,9 +74,7 @@ function asObject(value) {
 function normalizeProfile(value) {
   const profile = asObject(value);
   return {
-    settings: asObject(profile.settings),
-    pinned: asArray(profile.pinned),
-    selected: typeof profile.selected === 'string' ? profile.selected : ''
+    settings: asObject(profile.settings)
   };
 }
 
@@ -92,12 +90,18 @@ function normalizeStoredState(value, appId) {
     }
   });
 
+  const firstLegacyProfile = asObject(Object.values(rawProfiles)[0]);
+
   return {
     version: STATE_VERSION,
     appId,
     links: asArray(state.links),
     groups: {
-      list: asArray(groups.list)
+      list: asArray(groups.list),
+      pinned: asArray(groups.pinned).length ? asArray(groups.pinned) : asArray(firstLegacyProfile.pinned),
+      selected: typeof groups.selected === 'string'
+        ? groups.selected
+        : (typeof firstLegacyProfile.selected === 'string' ? firstLegacyProfile.selected : '')
     },
     profiles,
     revision: Number.isSafeInteger(state.revision) ? state.revision : 0,
@@ -140,7 +144,9 @@ async function writeState(bucket, appId, incoming) {
     appId,
     links: asArray(payload.links),
     groups: {
-      list: asArray(groups.list)
+      list: asArray(groups.list),
+      pinned: asArray(groups.pinned),
+      selected: typeof groups.selected === 'string' ? groups.selected : ''
     },
     profiles: { ...existing.profiles },
     revision: existing.revision + 1,
