@@ -135,7 +135,14 @@ export function createHomeRenderer({
   }
 
   function render() {
-    const groups = getGroups();
+    const sourceGroups = getGroups() || {};
+    const groupList = Array.isArray(sourceGroups.list) ? sourceGroups.list : [];
+    const pinnedGroups = Array.isArray(sourceGroups.pinned) ? sourceGroups.pinned : [];
+    const groups = {
+      ...sourceGroups,
+      list: groupList,
+      pinned: pinnedGroups
+    };
     const selectedGroup = getSelectedGroup();
     applySettings();
 

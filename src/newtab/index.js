@@ -87,6 +87,15 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     profiles[profileId] = getProfileFromState({ groups, settings });
   }
 
+  function applyActiveProfileToGroups() {
+    const activeProfile = normalizeProfile(profiles[profileId], groups, settings);
+    profiles[profileId] = activeProfile;
+    groups.pinned = activeProfile.pinned;
+    groups.selected = activeProfile.selected;
+    settings = activeProfile.settings;
+    selectedGroup = groups.selected;
+  }
+
   function refreshSettingsControls() {
     settingIconSize.value = settings.iconSize;
     settingIconSizeVal.textContent = settings.iconSize + 'px';
@@ -489,19 +498,25 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && suppressStorageSync) return;
     if (area === 'local' && (changes.links || changes.groups || changes.settings || changes.profiles || changes.syncProfile)) {
+      let shouldApplyActiveProfile = false;
       if (changes.links) links = changes.links.newValue || [];
       if (changes.groups) {
-        groups = changes.groups.newValue || groups;
-        selectedGroup = groups.selected || selectedGroup;
+        groups = Object.assign({}, groups, changes.groups.newValue || {});
+        shouldApplyActiveProfile = true;
       }
       if (changes.settings) {
         settings = Object.assign({}, DEFAULT_SETTINGS, changes.settings.newValue || {});
       }
       if (changes.profiles) {
         profiles = changes.profiles.newValue || profiles;
+        shouldApplyActiveProfile = true;
       }
       if (changes.syncProfile) {
         profileId = changes.syncProfile.newValue || profileId;
+        shouldApplyActiveProfile = true;
+      }
+      if (shouldApplyActiveProfile) {
+        applyActiveProfileToGroups();
       }
       render();
     }
