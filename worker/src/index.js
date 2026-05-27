@@ -71,9 +71,18 @@ function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
-function normalizeProfile(value) {
+function normalizeProfile(value, fallbackGroups = {}) {
   const profile = asObject(value);
+  const fallbackPinned = asArray(fallbackGroups.pinned);
+  const groupList = asArray(fallbackGroups.list);
+  const rawPinned = asArray(profile.pinned).length ? asArray(profile.pinned) : fallbackPinned;
+  const pinned = groupList.length ? rawPinned.filter(name => groupList.includes(name)) : rawPinned;
+  const selected = typeof profile.selected === 'string'
+    ? profile.selected
+    : (typeof fallbackGroups.selected === 'string' ? fallbackGroups.selected : '');
   return {
+    pinned,
+    selected: groupList.length && !groupList.includes(selected) ? '' : selected,
     settings: asObject(profile.settings)
   };
 }
@@ -86,22 +95,21 @@ function normalizeStoredState(value, appId) {
 
   Object.entries(rawProfiles).forEach(([profileId, profile]) => {
     if (APP_ID_PATTERN.test(profileId)) {
-      profiles[profileId] = normalizeProfile(profile);
+      profiles[profileId] = normalizeProfile(profile, groups);
     }
   });
 
-  const firstLegacyProfile = asObject(Object.values(rawProfiles)[0]);
+  const legacyProfileId = String(state.profileId || '').toLowerCase();
+  if (!Object.keys(profiles).length && APP_ID_PATTERN.test(legacyProfileId)) {
+    profiles[legacyProfileId] = normalizeProfile(null, groups);
+  }
 
   return {
     version: STATE_VERSION,
     appId,
     links: asArray(state.links),
     groups: {
-      list: asArray(groups.list),
-      pinned: asArray(groups.pinned).length ? asArray(groups.pinned) : asArray(firstLegacyProfile.pinned),
-      selected: typeof groups.selected === 'string'
-        ? groups.selected
-        : (typeof firstLegacyProfile.selected === 'string' ? firstLegacyProfile.selected : '')
+      list: asArray(groups.list)
     },
     profiles,
     revision: Number.isSafeInteger(state.revision) ? state.revision : 0,
@@ -144,9 +152,7 @@ async function writeState(bucket, appId, incoming) {
     appId,
     links: asArray(payload.links),
     groups: {
-      list: asArray(groups.list),
-      pinned: asArray(groups.pinned),
-      selected: typeof groups.selected === 'string' ? groups.selected : ''
+      list: asArray(groups.list)
     },
     profiles: { ...existing.profiles },
     revision: existing.revision + 1,
@@ -154,11 +160,11 @@ async function writeState(bucket, appId, incoming) {
   };
 
   if (profileId) {
-    next.profiles[profileId] = normalizeProfile(payload.profile);
+    next.profiles[profileId] = normalizeProfile(payload.profile, groups);
   } else {
     Object.entries(asObject(payload.profiles)).forEach(([id, profile]) => {
       if (APP_ID_PATTERN.test(id)) {
-        next.profiles[id] = normalizeProfile(profile);
+        next.profiles[id] = normalizeProfile(profile, groups);
       }
     });
   }

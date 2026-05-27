@@ -14,6 +14,15 @@ Extension hien tai dung `appId` la `homepage`, nen object R2 se nam o:
 apps/homepage/state.v1.json
 ```
 
+## Homepage sync model
+
+- Shared across profiles: `links` and `groups.list`.
+- Per profile: `profile.pinned`, `profile.selected`, and `profile.settings`
+  such as icon size.
+
+This lets `macbook` and `mobile` use different pinned groups and UI sizing
+while still sharing the same groups and links.
+
 ## Deploy
 
 ```sh

@@ -15,14 +15,21 @@ function normalizeSelected(value, list, pinned) {
 
 export function normalizeProfile(profile, fallbackGroups = DEFAULT_GROUPS, fallbackSettings = DEFAULT_SETTINGS) {
     const source = profile && typeof profile === 'object' ? profile : {};
+    const groupList = Array.isArray(fallbackGroups.list) ? fallbackGroups.list : DEFAULT_GROUPS.list;
+    const pinned = normalizePinned(source.pinned ?? fallbackGroups.pinned).filter(g => groupList.includes(g));
+    const safePinned = pinned.length ? pinned : deepClone(DEFAULT_GROUPS.pinned).filter(g => groupList.includes(g));
 
     return {
+        pinned: safePinned,
+        selected: normalizeSelected(source.selected ?? fallbackGroups.selected, groupList, safePinned),
         settings: Object.assign({}, DEFAULT_SETTINGS, fallbackSettings || {}, source.settings || {})
     };
 }
 
 export function getProfileFromState(state) {
     return normalizeProfile({
+        pinned: state.groups.pinned,
+        selected: state.groups.selected,
         settings: state.settings
     }, state.groups, state.settings);
 }
@@ -54,16 +61,13 @@ export function loadAppData(state) {
             state.profiles = Object.assign(deepClone(DEFAULT_PROFILES), savedProfiles);
 
             const activeProfile = normalizeProfile(
-                savedProfiles[state.profileId] || null,
+                savedProfiles[state.profileId] || state.profiles[state.profileId] || null,
                 state.groups,
                 state.settings
             );
             state.profiles[state.profileId] = activeProfile;
-            state.groups.pinned = normalizePinned(state.groups.pinned).filter(g => state.groups.list.includes(g));
-            if (!state.groups.pinned.length) {
-                state.groups.pinned = deepClone(DEFAULT_GROUPS.pinned).filter(g => state.groups.list.includes(g));
-            }
-            state.groups.selected = normalizeSelected(state.groups.selected, state.groups.list, state.groups.pinned);
+            state.groups.pinned = activeProfile.pinned;
+            state.groups.selected = activeProfile.selected;
             state.settings = activeProfile.settings;
             state.selectedGroup = state.groups.selected;
             resolve();
@@ -78,9 +82,7 @@ export function saveAppData(state) {
     chrome.storage.local.set({
         [STORAGE_KEYS.links]: state.links,
         [STORAGE_KEYS.groups]: {
-            list: state.groups.list,
-            pinned: state.groups.pinned,
-            selected: state.groups.selected
+            list: state.groups.list
         },
         [STORAGE_KEYS.settings]: state.settings,
         [STORAGE_KEYS.profiles]: profiles,

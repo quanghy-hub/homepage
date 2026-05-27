@@ -100,6 +100,8 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
 
     const nextProfile = normalizeProfile(profiles[profileId], groups, settings);
     profiles[profileId] = nextProfile;
+    groups.pinned = nextProfile.pinned;
+    groups.selected = nextProfile.selected;
     settings = nextProfile.settings;
     selectedGroup = groups.selected;
 
@@ -158,13 +160,23 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
 
   function renameGroupInProfiles(oldName, newName) {
     Object.keys(profiles).forEach(id => {
-      profiles[id] = normalizeProfile(profiles[id], groups, settings);
+      const profile = profiles[id] || {};
+      const pinned = Array.isArray(profile.pinned)
+        ? profile.pinned.map(groupName => groupName === oldName ? newName : groupName)
+        : groups.pinned;
+      const selected = profile.selected === oldName ? newName : profile.selected;
+      profiles[id] = normalizeProfile({ ...profile, pinned, selected }, groups, profile.settings || settings);
     });
   }
 
   function removeGroupFromProfiles(groupName) {
     Object.keys(profiles).forEach(id => {
-      profiles[id] = normalizeProfile(profiles[id], groups, settings);
+      const profile = profiles[id] || {};
+      const pinned = Array.isArray(profile.pinned)
+        ? profile.pinned.filter(name => name !== groupName)
+        : groups.pinned;
+      const selected = profile.selected === groupName ? '' : profile.selected;
+      profiles[id] = normalizeProfile({ ...profile, pinned, selected }, groups, profile.settings || settings);
     });
   }
 
@@ -443,19 +455,10 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     }
 
     profiles = Object.assign({}, profiles, imported.profiles || {});
-    const activeProfile = normalizeProfile(profiles[profileId], groups, settings);
+    const activeProfile = normalizeProfile(profiles[profileId], imported.groups || groups, settings);
     profiles[profileId] = activeProfile;
-    if (Array.isArray(imported.groups?.pinned)) {
-      groups.pinned = imported.groups.pinned.filter(name => groups.list.includes(name));
-    }
-    if (!groups.pinned?.length) {
-      groups.pinned = [groups.list[0]].filter(Boolean);
-    }
-    if (typeof imported.groups?.selected === 'string' && groups.list.includes(imported.groups.selected)) {
-      groups.selected = imported.groups.selected;
-    } else if (!groups.list.includes(groups.selected)) {
-      groups.selected = getFallbackSelected();
-    }
+    groups.pinned = activeProfile.pinned;
+    groups.selected = activeProfile.selected;
     settings = activeProfile.settings;
     selectedGroup = groups.selected;
   }
