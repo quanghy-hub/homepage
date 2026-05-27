@@ -253,9 +253,12 @@ export function createSyncController({
           });
       },
       onDelayChange: (delaySeconds) => {
+        const hasPendingPush = !!autoSyncTimer;
         setLiveStatus(`delay updated to ${delaySeconds}s`);
         startAutoRestore();
-        scheduleAutoSync();
+        if (hasPendingPush) {
+          scheduleAutoSync();
+        }
       }
     });
 
