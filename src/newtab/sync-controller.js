@@ -28,6 +28,9 @@ export function createSyncController({
   switchProfile
 }) {
   let autoSyncTimer = null;
+  let autoRestoreTimer = null;
+  let isPushing = false;
+  let isRestoring = false;
   let syncReady = false;
 
   function setSyncStatus(msg, type = '') {
@@ -70,12 +73,17 @@ export function createSyncController({
     persistCurrentProfile();
     if (showStatus) setSyncStatus('Pushing to B...');
 
-    const updated = await pushCloudflareState(dom, getState(), getRevision());
-    applyRemoteState(updated);
-    syncReady = true;
-    saveSyncReady(true);
-    saveData({ skipAutoSync: true });
-    refreshSettingsControls();
+    isPushing = true;
+    try {
+      const updated = await pushCloudflareState(dom, getState(), getRevision());
+      applyRemoteState(updated);
+      syncReady = true;
+      saveSyncReady(true);
+      saveData({ skipAutoSync: true });
+      refreshSettingsControls();
+    } finally {
+      isPushing = false;
+    }
 
     if (showStatus) {
       setSyncStatus('✓ B synced · ' + new Date().toLocaleTimeString(), 'ok');
@@ -116,6 +124,7 @@ export function createSyncController({
     setLiveStatus(`B in ${config.delaySeconds || 5}s`);
 
     autoSyncTimer = setTimeout(async () => {
+      autoSyncTimer = null;
       try {
         setLiveStatus('B syncing...');
         await pushToCloudflare(false);
@@ -125,6 +134,51 @@ export function createSyncController({
         setSyncStatus('✗ Auto sync error: ' + err.message, 'err');
       }
     }, delayMs);
+  }
+
+  async function restoreLatestFromB(showStatus = false) {
+    if (autoSyncTimer || isPushing || isRestoring) return false;
+
+    isRestoring = true;
+    try {
+      const remote = await pullCloudflareState(dom);
+      const remoteRevision = Number.isSafeInteger(remote?.revision) ? remote.revision : 0;
+      const localRevision = Number.isSafeInteger(getRevision()) ? getRevision() : 0;
+
+      if (remoteRevision <= localRevision) return false;
+
+      applyRemoteState(remote);
+      syncReady = true;
+      saveSyncReady(true);
+      saveData({ skipAutoSync: true });
+      render();
+      refreshSettingsControls();
+
+      const msg = 'B restored ' + new Date().toLocaleTimeString();
+      setLiveStatus(msg);
+      if (showStatus) setSyncStatus('✓ ' + msg, 'ok');
+      return true;
+    } finally {
+      isRestoring = false;
+    }
+  }
+
+  function startAutoRestore() {
+    clearInterval(autoRestoreTimer);
+    const config = getSyncSettings(dom);
+    if (!config.workerUrl || !config.apiCode) {
+      refreshStatus();
+      return;
+    }
+
+    const intervalMs = Math.max(1, config.delaySeconds || 5) * 1000;
+    autoRestoreTimer = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      restoreLatestFromB(false).catch(err => {
+        setLiveStatus('B restore error');
+        setSyncStatus('✗ Auto restore error: ' + err.message, 'err');
+      });
+    }, intervalMs);
   }
 
   function refreshStatus() {
@@ -142,9 +196,11 @@ export function createSyncController({
       onConfigChange: () => {
         syncReady = false;
         setLiveStatus('settings updated');
+        startAutoRestore();
       },
       onDelayChange: (delaySeconds) => {
         setLiveStatus(`delay updated to ${delaySeconds}s`);
+        startAutoRestore();
         scheduleAutoSync();
       }
     });
@@ -154,14 +210,19 @@ export function createSyncController({
         dom.verifySyncBtn.disabled = true;
         setVerifyStatus('Testing connection...');
 
-        const remote = await verifyCloudflareSync(dom);
-        if (Number.isSafeInteger(remote.revision)) {
-          setRevision(remote.revision);
-          saveSyncRevision(remote.revision);
+        const restored = await restoreLatestFromB(false);
+        if (restored) {
+          setVerifyStatus('✓ Connected and restored latest B', 'ok');
+        } else {
+          const remote = await verifyCloudflareSync(dom);
+          if (Number.isSafeInteger(remote.revision)) {
+            saveSyncRevision(remote.revision);
+          }
+          syncReady = true;
+          saveSyncReady(true);
+          setVerifyStatus('✓ Connected to Worker successfully', 'ok');
         }
-        syncReady = true;
-        saveSyncReady(true);
-        setVerifyStatus('✓ Connected to Worker successfully', 'ok');
+        startAutoRestore();
       } catch (err) {
         setVerifyStatus('✗ Connection failed · ' + err.message, 'err');
       } finally {
@@ -224,6 +285,7 @@ export function createSyncController({
     loadSavedRevision: loadSavedSyncRevision,
     scheduleAutoSync,
     refreshStatus,
+    startAutoRestore,
     setVerifyStatus,
     pull: pullFromCloudflare
   };
