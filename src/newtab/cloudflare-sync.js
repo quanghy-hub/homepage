@@ -4,8 +4,7 @@ import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
 export const SYNC_APP_ID = 'homepage';
 export const DEFAULT_WORKER_URL = 'https://extension.quavav15-6.workers.dev';
 export const PROFILE_IDS = ['macbook', 'mobile'];
-export const SYNC_MODES = ['manual', 'auto'];
-export const DEFAULT_SYNC_MODE = 'manual';
+export const BACKUP_SLOTS = ['a', 'b'];
 
 export function setSyncStatus(dom, msg, type = '') {
     dom.syncStatus.textContent = msg;
@@ -24,16 +23,17 @@ export function getSyncSettings(dom) {
     const profileId = PROFILE_IDS.includes(dom.syncProfileSelect.value)
         ? dom.syncProfileSelect.value
         : DEFAULT_PROFILE_ID;
-    const syncMode = SYNC_MODES.includes(dom.syncModeSelect?.value)
-        ? dom.syncModeSelect.value
-        : DEFAULT_SYNC_MODE;
-
-    return { workerUrl, apiCode, profileId, syncMode };
+    return { workerUrl, apiCode, profileId, syncMode: 'auto' };
 }
 
 export function getStateEndpoint(workerUrl) {
     if (!workerUrl) return '';
     return `${workerUrl.replace(/\/+$/, '')}/sync/${SYNC_APP_ID}/state`;
+}
+
+export function getBackupEndpoint(workerUrl, slot) {
+    if (!workerUrl) return '';
+    return `${workerUrl.replace(/\/+$/, '')}/sync/${SYNC_APP_ID}/backup/${slot}`;
 }
 
 export function getSyncHeaders(apiCode) {
@@ -58,7 +58,6 @@ function buildConfiguredSync(dom) {
 export function bindSyncCredentialInputs(dom, handlers = {}) {
     const onProfileChange = typeof handlers === 'function' ? handlers : handlers.onProfileChange;
     const onConfigChange = typeof handlers === 'object' ? handlers.onConfigChange : null;
-    const onModeChange = typeof handlers === 'object' ? handlers.onModeChange : null;
 
     function markSyncConfigChanged() {
         chrome.storage.local.set({ [STORAGE_KEYS.syncReady]: false });
@@ -82,32 +81,21 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
         if (onProfileChange) onProfileChange(profileId);
     });
 
-    dom.syncModeSelect?.addEventListener('change', () => {
-        const syncMode = SYNC_MODES.includes(dom.syncModeSelect.value)
-            ? dom.syncModeSelect.value
-            : DEFAULT_SYNC_MODE;
-        chrome.storage.local.set({ [STORAGE_KEYS.syncMode]: syncMode });
-        if (onModeChange) onModeChange(syncMode);
-    });
+    chrome.storage.local.set({ [STORAGE_KEYS.syncMode]: 'auto' });
 }
 
 export function loadSavedSyncCredentials(dom) {
     chrome.storage.local.get([
         STORAGE_KEYS.syncWorkerUrl,
         STORAGE_KEYS.syncApiCode,
-        STORAGE_KEYS.syncProfile,
-        STORAGE_KEYS.syncMode
+        STORAGE_KEYS.syncProfile
     ], result => {
         dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
         dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
         dom.syncProfileSelect.value = PROFILE_IDS.includes(result[STORAGE_KEYS.syncProfile])
             ? result[STORAGE_KEYS.syncProfile]
             : DEFAULT_PROFILE_ID;
-        if (dom.syncModeSelect) {
-            dom.syncModeSelect.value = SYNC_MODES.includes(result[STORAGE_KEYS.syncMode])
-                ? result[STORAGE_KEYS.syncMode]
-                : DEFAULT_SYNC_MODE;
-        }
+        if (dom.syncModeSelect) dom.syncModeSelect.value = 'auto';
     });
 }
 
@@ -168,6 +156,27 @@ export async function verifyCloudflareSync(dom) {
 
 export async function pullCloudflareState(dom) {
     const { endpoint, headers } = buildConfiguredSync(dom);
+    const res = await fetch(endpoint, {
+        method: 'GET',
+        headers
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    return res.json();
+}
+
+export async function pullCloudflareBackup(dom, slot) {
+    const normalizedSlot = String(slot || '').toLowerCase();
+    if (!BACKUP_SLOTS.includes(normalizedSlot)) {
+        throw new Error('Invalid backup slot');
+    }
+    const config = getSyncSettings(dom);
+    const endpoint = getBackupEndpoint(config.workerUrl, normalizedSlot);
+    const headers = getSyncHeaders(config.apiCode);
+
+    if (!config.workerUrl) throw new Error('Please enter Worker URL first');
+    if (!headers) throw new Error('Please enter API code first');
+
     const res = await fetch(endpoint, {
         method: 'GET',
         headers

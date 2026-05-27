@@ -4,6 +4,7 @@ import {
   loadSyncReady,
   loadSavedSyncCredentials,
   loadSavedSyncRevision,
+  pullCloudflareBackup,
   pullCloudflareState,
   saveSyncReady,
   pushCloudflareState,
@@ -76,14 +77,30 @@ export function createSyncController({
     }
   }
 
+  async function restoreFromBackup(slot) {
+    const label = slot === 'a' ? 'A' : 'B';
+    setSyncStatus(`Restoring backup ${label}...`);
+
+    const imported = await pullCloudflareBackup(dom, slot);
+    applyRemoteState(imported);
+    saveData({ skipAutoSync: true });
+    render();
+    refreshSettingsControls();
+
+    const updated = await pushCloudflareState(dom, getState(), getRevision());
+    applyRemoteState(updated);
+    saveData({ skipAutoSync: true });
+    setSyncStatus(`✓ Restored backup ${label} · ` + new Date().toLocaleTimeString(), 'ok');
+  }
+
   function scheduleAutoSync() {
     clearTimeout(autoSyncTimer);
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) return;
-    if (config.syncMode !== 'auto') return;
 
     autoSyncTimer = setTimeout(async () => {
       try {
+        setSyncStatus('Auto syncing...');
         await pushToCloudflare(false);
         setSyncStatus('✓ Auto synced · ' + new Date().toLocaleTimeString(), 'ok');
       } catch (err) {
@@ -98,13 +115,6 @@ export function createSyncController({
       onConfigChange: () => {
         syncReady = false;
         setSyncStatus('Sync configuration updated.', '');
-      },
-      onModeChange: syncMode => {
-        if (syncMode === 'auto') {
-          setSyncStatus('Auto sync enabled.', 'ok');
-        } else if (syncMode === 'manual') {
-          setSyncStatus('Manual mode enabled: Use Push / Pull to sync.', '');
-        }
       }
     });
 
@@ -137,7 +147,7 @@ export function createSyncController({
       }
     });
 
-    dom.syncPull.addEventListener('click', async () => {
+    dom.syncPull?.addEventListener('click', async () => {
       dom.syncPull.disabled = true;
       try {
         await pullFromCloudflare(true);
@@ -145,6 +155,28 @@ export function createSyncController({
         setSyncStatus('✗ Error: ' + err.message, 'err');
       } finally {
         dom.syncPull.disabled = false;
+      }
+    });
+
+    dom.syncRestoreA?.addEventListener('click', async () => {
+      dom.syncRestoreA.disabled = true;
+      try {
+        await restoreFromBackup('a');
+      } catch (err) {
+        setSyncStatus('✗ Restore A error: ' + err.message, 'err');
+      } finally {
+        dom.syncRestoreA.disabled = false;
+      }
+    });
+
+    dom.syncRestoreB?.addEventListener('click', async () => {
+      dom.syncRestoreB.disabled = true;
+      try {
+        await restoreFromBackup('b');
+      } catch (err) {
+        setSyncStatus('✗ Restore B error: ' + err.message, 'err');
+      } finally {
+        dom.syncRestoreB.disabled = false;
       }
     });
   }

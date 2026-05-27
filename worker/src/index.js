@@ -1,5 +1,7 @@
 const STATE_VERSION = 1;
+const DAILY_BACKUP_MS = 24 * 60 * 60 * 1000;
 const APP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+const BACKUP_SLOT_PATTERN = /^[ab]$/;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -29,8 +31,21 @@ function getAppId(pathname) {
   return decodeURIComponent(match[1]).toLowerCase();
 }
 
+function getBackupRoute(pathname) {
+  const match = pathname.match(/^\/sync\/([^/]+)\/backup\/([^/]+)\/?$/);
+  if (!match) return null;
+  return {
+    appId: decodeURIComponent(match[1]).toLowerCase(),
+    slot: decodeURIComponent(match[2]).toLowerCase()
+  };
+}
+
 function getStateKey(appId) {
   return `apps/${appId}/state.v1.json`;
+}
+
+function getBackupKey(appId, slot) {
+  return `apps/${appId}/backup-${slot}.v1.json`;
 }
 
 function getBearerToken(request) {
@@ -71,20 +86,49 @@ function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+function normalizeSession(session, index) {
+  const s = asObject(session);
+  return {
+    name: typeof s.name === 'string' ? s.name : `Session ${index + 1}`,
+    updatedAt: Number.isSafeInteger(s.updatedAt) ? s.updatedAt : null,
+    cookies: asArray(s.cookies),
+    localStorage: asObject(s.localStorage),
+    sessionStorage: asObject(s.sessionStorage)
+  };
+}
+
+function normalizeSite(site) {
+  const s = asObject(site);
+  return {
+    id: typeof s.id === 'string' ? s.id : '',
+    origin: typeof s.origin === 'string' ? s.origin : '',
+    host: typeof s.host === 'string' ? s.host : '',
+    activeSlot: Number.isInteger(s.activeSlot) ? s.activeSlot : null,
+    sessions: asArray(s.sessions).map((session, index) => normalizeSession(session, index))
+  };
+}
+
 function normalizeProfile(value, fallbackGroups = {}) {
   const profile = asObject(value);
-  const fallbackPinned = asArray(fallbackGroups.pinned);
+  const normalized = {};
   const groupList = asArray(fallbackGroups.list);
-  const rawPinned = asArray(profile.pinned).length ? asArray(profile.pinned) : fallbackPinned;
-  const pinned = groupList.length ? rawPinned.filter(name => groupList.includes(name)) : rawPinned;
-  const selected = typeof profile.selected === 'string'
-    ? profile.selected
-    : (typeof fallbackGroups.selected === 'string' ? fallbackGroups.selected : '');
-  return {
-    pinned,
-    selected: groupList.length && !groupList.includes(selected) ? '' : selected,
-    settings: asObject(profile.settings)
-  };
+
+  if (Object.prototype.hasOwnProperty.call(profile, 'sites')) {
+    normalized.sites = asArray(profile.sites).map(normalizeSite);
+  }
+  if (Object.prototype.hasOwnProperty.call(profile, 'settings')) {
+    normalized.settings = asObject(profile.settings);
+  }
+  if (Object.prototype.hasOwnProperty.call(profile, 'pinned') || asArray(fallbackGroups.pinned).length) {
+    const rawPinned = asArray(profile.pinned).length ? asArray(profile.pinned) : asArray(fallbackGroups.pinned);
+    normalized.pinned = groupList.length ? rawPinned.filter(name => groupList.includes(name)) : rawPinned;
+  }
+  if (typeof profile.selected === 'string' || typeof fallbackGroups.selected === 'string') {
+    const selected = typeof profile.selected === 'string' ? profile.selected : fallbackGroups.selected;
+    normalized.selected = groupList.length && !groupList.includes(selected) ? '' : selected;
+  }
+
+  return normalized;
 }
 
 function normalizeStoredState(value, appId) {
@@ -109,11 +153,15 @@ function normalizeStoredState(value, appId) {
     appId,
     links: asArray(state.links),
     groups: {
-      list: asArray(groups.list)
+      list: asArray(groups.list),
+      pinned: asArray(groups.pinned),
+      selected: typeof groups.selected === 'string' ? groups.selected : ''
     },
     profiles,
     revision: Number.isSafeInteger(state.revision) ? state.revision : 0,
-    updatedAt: typeof state.updatedAt === 'string' ? state.updatedAt : null
+    updatedAt: typeof state.updatedAt === 'string' ? state.updatedAt : null,
+    backupSlot: typeof state.backupSlot === 'string' ? state.backupSlot : null,
+    backupUpdatedAt: typeof state.backupUpdatedAt === 'string' ? state.backupUpdatedAt : null
   };
 }
 
@@ -126,6 +174,39 @@ async function readState(bucket, appId) {
   } catch {
     return normalizeStoredState(null, appId);
   }
+}
+
+async function readBackup(bucket, appId, slot) {
+  const object = await bucket.get(getBackupKey(appId, slot));
+  if (!object) return null;
+
+  try {
+    return normalizeStoredState(await object.json(), appId);
+  } catch {
+    return null;
+  }
+}
+
+async function writeObject(bucket, key, state) {
+  await bucket.put(key, JSON.stringify(state, null, 2), {
+    httpMetadata: {
+      contentType: 'application/json; charset=utf-8'
+    }
+  });
+}
+
+async function maybeRotateDailyBackup(bucket, appId, snapshot) {
+  const existingBackup = await readBackup(bucket, appId, 'a');
+  const lastUpdated = existingBackup?.backupUpdatedAt ? Date.parse(existingBackup.backupUpdatedAt) : 0;
+  if (existingBackup && Number.isFinite(lastUpdated) && Date.now() - lastUpdated < DAILY_BACKUP_MS) {
+    return;
+  }
+
+  await writeObject(bucket, getBackupKey(appId, 'a'), {
+    ...snapshot,
+    backupSlot: 'a',
+    backupUpdatedAt: new Date().toISOString()
+  });
 }
 
 async function writeState(bucket, appId, incoming) {
@@ -150,10 +231,14 @@ async function writeState(bucket, appId, incoming) {
   const next = {
     version: STATE_VERSION,
     appId,
-    links: asArray(payload.links),
-    groups: {
-      list: asArray(groups.list)
-    },
+    links: Object.prototype.hasOwnProperty.call(payload, 'links') ? asArray(payload.links) : existing.links,
+    groups: Object.prototype.hasOwnProperty.call(payload, 'groups')
+      ? {
+          list: asArray(groups.list),
+          pinned: asArray(groups.pinned),
+          selected: typeof groups.selected === 'string' ? groups.selected : ''
+        }
+      : existing.groups,
     profiles: { ...existing.profiles },
     revision: existing.revision + 1,
     updatedAt: new Date().toISOString()
@@ -169,10 +254,12 @@ async function writeState(bucket, appId, incoming) {
     });
   }
 
-  await bucket.put(getStateKey(appId), JSON.stringify(next, null, 2), {
-    httpMetadata: {
-      contentType: 'application/json; charset=utf-8'
-    }
+  await maybeRotateDailyBackup(bucket, appId, existing.revision > 0 ? existing : next);
+  await writeObject(bucket, getStateKey(appId), next);
+  await writeObject(bucket, getBackupKey(appId, 'b'), {
+    ...next,
+    backupSlot: 'b',
+    backupUpdatedAt: new Date().toISOString()
   });
 
   return next;
@@ -185,13 +272,28 @@ export default {
     }
 
     const url = new URL(request.url);
-    const appId = getAppId(url.pathname);
+    const backupRoute = getBackupRoute(url.pathname);
+    const appId = backupRoute?.appId || getAppId(url.pathname);
     if (!appId || !APP_ID_PATTERN.test(appId)) {
+      return errorResponse('Not found', 404);
+    }
+    if (backupRoute && !BACKUP_SLOT_PATTERN.test(backupRoute.slot)) {
       return errorResponse('Not found', 404);
     }
 
     if (!(await isAuthorized(request, env))) {
       return errorResponse('Unauthorized', 401);
+    }
+
+    if (backupRoute) {
+      if (request.method !== 'GET') {
+        return errorResponse('Method not allowed', 405);
+      }
+      const backup = await readBackup(env.EXTENSION_BUCKET, appId, backupRoute.slot);
+      if (!backup) {
+        return errorResponse('Backup not found', 404);
+      }
+      return jsonResponse(backup);
     }
 
     if (request.method === 'GET') {

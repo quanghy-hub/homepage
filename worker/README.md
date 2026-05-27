@@ -6,6 +6,8 @@ Cloudflare Worker dung chung de dong bo du lieu cho cac extension qua R2.
 
 - `GET /sync/:appId/state`
 - `PUT /sync/:appId/state`
+- `GET /sync/:appId/backup/a`
+- `GET /sync/:appId/backup/b`
 - `OPTIONS /sync/:appId/state`
 
 Extension hien tai dung `appId` la `homepage`, nen object R2 se nam o:
@@ -22,6 +24,9 @@ apps/homepage/state.v1.json
 
 This lets `macbook` and `mobile` use different pinned groups and UI sizing
 while still sharing the same groups and links.
+
+Backup `b` is updated on every successful write. Backup `a` is a daily safety
+snapshot taken from the previous live state before the new write is saved.
 
 ## Deploy
 

@@ -43,7 +43,7 @@ export function getDomRefs() {
             addEventListener(event, cb) { addRadioListener('sync-profile', event, cb); }
         },
         syncModeSelect: {
-            get value() { return getRadioVal('sync-mode'); },
+            get value() { return getRadioVal('sync-mode') || 'auto'; },
             set value(val) { setRadioVal('sync-mode', val); },
             addEventListener(event, cb) { addRadioListener('sync-mode', event, cb); }
         },
@@ -51,6 +51,8 @@ export function getDomRefs() {
         syncVerifyStatus: document.getElementById('sync-verify-status'),
         syncPush: document.getElementById('sync-push'),
         syncPull: document.getElementById('sync-pull'),
+        syncRestoreA: document.getElementById('sync-restore-a'),
+        syncRestoreB: document.getElementById('sync-restore-b'),
         syncStatus: document.getElementById('sync-status')
     };
 }

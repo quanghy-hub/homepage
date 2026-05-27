@@ -784,13 +784,13 @@ body.edit-mode .pinned-group-header:active {
 
 /* ===== Sync ===== */
 .sync-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 4px;
 }
 
 .btn-sync {
-  flex: 1;
   padding: 8px 0;
   border-radius: 8px;
   border: none;
@@ -833,7 +833,7 @@ body.edit-mode .pinned-group-header:active {
   }
 
   .sync-actions {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
 }
 
@@ -909,4 +909,3 @@ body.edit-mode .pinned-group-header:active {
 .segment-option:hover span {
   color: #e6edf3;
 }
-
