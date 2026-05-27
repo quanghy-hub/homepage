@@ -5,6 +5,8 @@ export const SYNC_APP_ID = 'homepage';
 export const DEFAULT_WORKER_URL = 'https://extension.quavav15-6.workers.dev';
 export const PROFILE_IDS = ['macbook', 'mobile'];
 export const BACKUP_SLOTS = ['a', 'b'];
+export const SYNC_DELAY_SECONDS = [5, 10, 30, 60];
+export const DEFAULT_SYNC_DELAY_SECONDS = 5;
 
 export function setSyncStatus(dom, msg, type = '') {
     dom.syncStatus.textContent = msg;
@@ -23,7 +25,10 @@ export function getSyncSettings(dom) {
     const profileId = PROFILE_IDS.includes(dom.syncProfileSelect.value)
         ? dom.syncProfileSelect.value
         : DEFAULT_PROFILE_ID;
-    return { workerUrl, apiCode, profileId, syncMode: 'auto' };
+    const delaySeconds = SYNC_DELAY_SECONDS.includes(Number(dom.syncDelaySelect?.value))
+        ? Number(dom.syncDelaySelect.value)
+        : DEFAULT_SYNC_DELAY_SECONDS;
+    return { workerUrl, apiCode, profileId, syncMode: 'auto', delaySeconds };
 }
 
 export function getStateEndpoint(workerUrl) {
@@ -81,6 +86,14 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
         if (onProfileChange) onProfileChange(profileId);
     });
 
+    dom.syncDelaySelect?.addEventListener('change', () => {
+        const delaySeconds = SYNC_DELAY_SECONDS.includes(Number(dom.syncDelaySelect.value))
+            ? Number(dom.syncDelaySelect.value)
+            : DEFAULT_SYNC_DELAY_SECONDS;
+        chrome.storage.local.set({ [STORAGE_KEYS.syncDelaySeconds]: delaySeconds });
+        if (onConfigChange) onConfigChange();
+    });
+
     chrome.storage.local.set({ [STORAGE_KEYS.syncMode]: 'auto' });
 }
 
@@ -88,7 +101,8 @@ export function loadSavedSyncCredentials(dom) {
     chrome.storage.local.get([
         STORAGE_KEYS.syncWorkerUrl,
         STORAGE_KEYS.syncApiCode,
-        STORAGE_KEYS.syncProfile
+        STORAGE_KEYS.syncProfile,
+        STORAGE_KEYS.syncDelaySeconds
     ], result => {
         dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
         dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
@@ -96,6 +110,12 @@ export function loadSavedSyncCredentials(dom) {
             ? result[STORAGE_KEYS.syncProfile]
             : DEFAULT_PROFILE_ID;
         if (dom.syncModeSelect) dom.syncModeSelect.value = 'auto';
+        if (dom.syncDelaySelect) {
+            const savedDelay = Number(result[STORAGE_KEYS.syncDelaySeconds]);
+            dom.syncDelaySelect.value = String(
+                SYNC_DELAY_SECONDS.includes(savedDelay) ? savedDelay : DEFAULT_SYNC_DELAY_SECONDS
+            );
+        }
     });
 }
 

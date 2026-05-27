@@ -37,6 +37,7 @@ export function getDomRefs() {
         settingsClose: document.getElementById('settings-close'),
         syncWorkerUrlInput: document.getElementById('setting-sync-worker-url'),
         syncApiCodeInput: document.getElementById('setting-sync-api-code'),
+        syncDelaySelect: document.getElementById('setting-sync-delay'),
         syncProfileSelect: {
             get value() { return getRadioVal('sync-profile'); },
             set value(val) { setRadioVal('sync-profile', val); },

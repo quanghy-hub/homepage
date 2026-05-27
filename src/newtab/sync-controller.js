@@ -14,8 +14,6 @@ import {
   verifyCloudflareSync
 } from './cloudflare-sync.js';
 
-const AUTO_SYNC_DELAY = 1200;
-
 export function createSyncController({
   applyImportedState,
   dom,
@@ -65,7 +63,7 @@ export function createSyncController({
 
   async function pushToCloudflare(showStatus = true) {
     persistCurrentProfile();
-    if (showStatus) setSyncStatus('Pushing to cloud...');
+    if (showStatus) setSyncStatus('Pushing to B...');
 
     const updated = await pushCloudflareState(dom, getState(), getRevision());
     applyRemoteState(updated);
@@ -73,7 +71,7 @@ export function createSyncController({
     refreshSettingsControls();
 
     if (showStatus) {
-      setSyncStatus('✓ Pushed successfully · ' + new Date().toLocaleTimeString(), 'ok');
+      setSyncStatus('✓ B synced · ' + new Date().toLocaleTimeString(), 'ok');
     }
   }
 
@@ -97,16 +95,18 @@ export function createSyncController({
     clearTimeout(autoSyncTimer);
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) return;
+    const delayMs = Math.max(1, config.delaySeconds || 5) * 1000;
+    setSyncStatus(`Auto sync scheduled in ${config.delaySeconds || 5}s...`);
 
     autoSyncTimer = setTimeout(async () => {
       try {
-        setSyncStatus('Auto syncing...');
+        setSyncStatus('Auto syncing to B...');
         await pushToCloudflare(false);
-        setSyncStatus('✓ Auto synced · ' + new Date().toLocaleTimeString(), 'ok');
+        setSyncStatus('✓ B auto synced · ' + new Date().toLocaleTimeString(), 'ok');
       } catch (err) {
         setSyncStatus('✗ Auto sync error: ' + err.message, 'err');
       }
-    }, AUTO_SYNC_DELAY);
+    }, delayMs);
   }
 
   function bind() {
