@@ -546,7 +546,8 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     loadFaviconCache(),
     syncController.loadSavedRevision(),
     syncController.loadSavedReady(),
-    syncController.loadSavedCredentials()
+    syncController.loadSavedCredentials(),
+    syncController.loadSavedStatuses()
   ]).then(([, , savedRevision]) => {
     syncRevision = savedRevision;
     render();

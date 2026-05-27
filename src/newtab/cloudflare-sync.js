@@ -18,12 +18,51 @@ function normalizeDelaySeconds(value) {
 export function setSyncStatus(dom, msg, type = '') {
     dom.syncStatus.textContent = msg;
     dom.syncStatus.className = 'sync-status' + (type ? ' ' + type : '');
+    chrome.storage.local.set({
+        [STORAGE_KEYS.syncStatus]: msg,
+        [STORAGE_KEYS.syncStatusType]: type
+    });
 }
 
 export function setVerifyStatus(dom, msg, type = '') {
     if (!dom.syncVerifyStatus) return;
     dom.syncVerifyStatus.textContent = msg;
     dom.syncVerifyStatus.className = 'sync-status' + (type ? ' ' + type : '');
+    chrome.storage.local.set({
+        [STORAGE_KEYS.syncVerifyStatus]: msg,
+        [STORAGE_KEYS.syncVerifyStatusType]: type
+    });
+}
+
+export function setLiveStatus(dom, msg) {
+    if (!dom.syncLiveStatus) return;
+    dom.syncLiveStatus.textContent = msg;
+    chrome.storage.local.set({ [STORAGE_KEYS.syncLiveStatus]: msg });
+}
+
+export function loadSavedSyncStatuses(dom) {
+    return new Promise(resolve => {
+        chrome.storage.local.get([
+            STORAGE_KEYS.syncStatus,
+            STORAGE_KEYS.syncStatusType,
+            STORAGE_KEYS.syncVerifyStatus,
+            STORAGE_KEYS.syncVerifyStatusType,
+            STORAGE_KEYS.syncLiveStatus
+        ], result => {
+            if (result[STORAGE_KEYS.syncStatus]) {
+                dom.syncStatus.textContent = result[STORAGE_KEYS.syncStatus];
+                dom.syncStatus.className = 'sync-status' + (result[STORAGE_KEYS.syncStatusType] ? ' ' + result[STORAGE_KEYS.syncStatusType] : '');
+            }
+            if (dom.syncVerifyStatus && result[STORAGE_KEYS.syncVerifyStatus]) {
+                dom.syncVerifyStatus.textContent = result[STORAGE_KEYS.syncVerifyStatus];
+                dom.syncVerifyStatus.className = 'sync-status' + (result[STORAGE_KEYS.syncVerifyStatusType] ? ' ' + result[STORAGE_KEYS.syncVerifyStatusType] : '');
+            }
+            if (dom.syncLiveStatus && result[STORAGE_KEYS.syncLiveStatus]) {
+                dom.syncLiveStatus.textContent = result[STORAGE_KEYS.syncLiveStatus];
+            }
+            resolve();
+        });
+    });
 }
 
 export function getSyncSettings(dom) {

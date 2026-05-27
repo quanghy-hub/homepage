@@ -4,12 +4,14 @@ import {
   loadSyncReady,
   loadSavedSyncCredentials,
   loadSavedSyncRevision,
+  loadSavedSyncStatuses,
   pullCloudflareBackup,
   pullCloudflareState,
   pushCloudflareBackup,
   saveSyncReady,
   pushCloudflareState,
   saveSyncRevision,
+  setLiveStatus as updateLiveStatus,
   setSyncStatus as updateSyncStatus,
   setVerifyStatus as updateVerifyStatus,
   verifyCloudflareSync
@@ -43,7 +45,7 @@ export function createSyncController({
   }
 
   function setLiveStatus(msg) {
-    if (dom.syncLiveStatus) dom.syncLiveStatus.textContent = msg;
+    updateLiveStatus(dom, msg);
   }
 
   function formatSyncStamp(date = new Date()) {
@@ -350,6 +352,7 @@ export function createSyncController({
       return syncReady;
     },
     loadSavedRevision: loadSavedSyncRevision,
+    loadSavedStatuses: () => loadSavedSyncStatuses(dom),
     scheduleAutoSync,
     bootstrapCloud,
     refreshStatus,

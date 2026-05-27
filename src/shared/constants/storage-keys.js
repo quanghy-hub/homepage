@@ -10,6 +10,11 @@ export const STORAGE_KEYS = {
     syncDelaySeconds: 'syncDelaySeconds',
     syncReady: 'syncReady',
     syncRevision: 'syncRevision',
+    syncStatus: 'syncStatus',
+    syncStatusType: 'syncStatusType',
+    syncVerifyStatus: 'syncVerifyStatus',
+    syncVerifyStatusType: 'syncVerifyStatusType',
+    syncLiveStatus: 'syncLiveStatus',
     recentPage: 'recentPage',
     faviconCache: 'faviconCache'
 };
