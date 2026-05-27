@@ -129,16 +129,20 @@
             <span>Mobile</span>
           </label>
         </div>
-        <label>Auto Sync Delay
-          <select id="setting-sync-delay">
-            <option value="5">5 seconds</option>
-            <option value="10">10 seconds</option>
-            <option value="30">30 seconds</option>
-            <option value="60">60 seconds</option>
-          </select>
-        </label>
+        <div class="sync-live-row">
+          <label for="setting-sync-delay">Auto B</label>
+          <input id="setting-sync-delay" type="number" min="1" max="3600" step="1" inputmode="numeric" value="5">
+          <span>sec</span>
+          <span id="sync-live-status" class="sync-live-status">ready</span>
+        </div>
+        <div class="sync-live-row">
+          <label for="setting-sync-a-hours">Auto A</label>
+          <input id="setting-sync-a-hours" type="number" min="1" max="24" step="1" inputmode="numeric" value="24">
+          <span>hr</span>
+          <span class="sync-live-status">backup cycle</span>
+        </div>
         <div class="sync-actions">
-          <button id="sync-push" class="btn-sync">Sync B Now</button>
+          <button id="sync-push" class="btn-sync">Sync A Now</button>
           <button id="sync-restore-a" class="btn-sync">Restore A</button>
           <button id="sync-restore-b" class="btn-sync">Restore B</button>
         </div>

@@ -6,6 +6,7 @@ import {
   loadSavedSyncRevision,
   pullCloudflareBackup,
   pullCloudflareState,
+  pushCloudflareBackup,
   saveSyncReady,
   pushCloudflareState,
   saveSyncRevision,
@@ -35,6 +36,10 @@ export function createSyncController({
 
   function setVerifyStatus(msg, type = '') {
     updateVerifyStatus(dom, msg, type);
+  }
+
+  function setLiveStatus(msg) {
+    if (dom.syncLiveStatus) dom.syncLiveStatus.textContent = msg;
   }
 
   function applyRemoteState(imported) {
@@ -75,6 +80,13 @@ export function createSyncController({
     }
   }
 
+  async function pushBackupA() {
+    setSyncStatus('Syncing A...');
+    const backup = await pushCloudflareBackup(dom, 'a');
+    setSyncStatus('✓ A synced · ' + new Date().toLocaleTimeString(), 'ok');
+    return backup;
+  }
+
   async function restoreFromBackup(slot) {
     const label = slot === 'a' ? 'A' : 'B';
     setSyncStatus(`Restoring backup ${label}...`);
@@ -96,14 +108,15 @@ export function createSyncController({
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) return;
     const delayMs = Math.max(1, config.delaySeconds || 5) * 1000;
-    setSyncStatus(`Auto sync scheduled in ${config.delaySeconds || 5}s...`);
+    setLiveStatus(`B in ${config.delaySeconds || 5}s`);
 
     autoSyncTimer = setTimeout(async () => {
       try {
-        setSyncStatus('Auto syncing to B...');
+        setLiveStatus('B syncing...');
         await pushToCloudflare(false);
-        setSyncStatus('✓ B auto synced · ' + new Date().toLocaleTimeString(), 'ok');
+        setLiveStatus('B synced ' + new Date().toLocaleTimeString());
       } catch (err) {
+        setLiveStatus('B error');
         setSyncStatus('✗ Auto sync error: ' + err.message, 'err');
       }
     }, delayMs);
@@ -114,7 +127,7 @@ export function createSyncController({
       onProfileChange: switchProfile,
       onConfigChange: () => {
         syncReady = false;
-        setSyncStatus('Sync configuration updated.', '');
+        setLiveStatus('settings updated');
       }
     });
 
@@ -139,7 +152,7 @@ export function createSyncController({
     dom.syncPush.addEventListener('click', async () => {
       dom.syncPush.disabled = true;
       try {
-        await pushToCloudflare(true);
+        await pushBackupA();
       } catch (err) {
         setSyncStatus('✗ Error: ' + err.message, 'err');
       } finally {

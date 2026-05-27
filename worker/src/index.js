@@ -1,5 +1,7 @@
 const STATE_VERSION = 1;
 const DAILY_BACKUP_MS = 24 * 60 * 60 * 1000;
+const MIN_BACKUP_A_INTERVAL_HOURS = 1;
+const MAX_BACKUP_A_INTERVAL_HOURS = 24;
 const APP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const BACKUP_SLOT_PATTERN = /^[ab]$/;
 
@@ -84,6 +86,13 @@ function asArray(value) {
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function normalizeBackupAIntervalMs(value) {
+  const hours = Number(value);
+  if (!Number.isFinite(hours)) return DAILY_BACKUP_MS;
+  const safeHours = Math.min(MAX_BACKUP_A_INTERVAL_HOURS, Math.max(MIN_BACKUP_A_INTERVAL_HOURS, Math.round(hours)));
+  return safeHours * 60 * 60 * 1000;
 }
 
 function normalizeSession(session, index) {
@@ -187,6 +196,23 @@ async function readBackup(bucket, appId, slot) {
   }
 }
 
+async function writeBackup(bucket, appId, slot) {
+  const current = await readState(bucket, appId);
+  if (!current || current.revision <= 0) {
+    const err = new Error('State not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const backup = {
+    ...current,
+    backupSlot: slot,
+    backupUpdatedAt: new Date().toISOString()
+  };
+  await writeObject(bucket, getBackupKey(appId, slot), backup);
+  return backup;
+}
+
 async function writeObject(bucket, key, state) {
   await bucket.put(key, JSON.stringify(state, null, 2), {
     httpMetadata: {
@@ -195,10 +221,10 @@ async function writeObject(bucket, key, state) {
   });
 }
 
-async function maybeRotateDailyBackup(bucket, appId, snapshot) {
+async function maybeRotateDailyBackup(bucket, appId, snapshot, intervalMs = DAILY_BACKUP_MS) {
   const existingBackup = await readBackup(bucket, appId, 'a');
   const lastUpdated = existingBackup?.backupUpdatedAt ? Date.parse(existingBackup.backupUpdatedAt) : 0;
-  if (existingBackup && Number.isFinite(lastUpdated) && Date.now() - lastUpdated < DAILY_BACKUP_MS) {
+  if (existingBackup && Number.isFinite(lastUpdated) && Date.now() - lastUpdated < intervalMs) {
     return;
   }
 
@@ -214,6 +240,7 @@ async function writeState(bucket, appId, incoming) {
   const payload = asObject(incoming);
   const groups = asObject(payload.groups);
   const profileId = String(payload.profileId || '').toLowerCase();
+  const backupAIntervalMs = normalizeBackupAIntervalMs(payload.backupAIntervalHours);
 
   if (profileId && !APP_ID_PATTERN.test(profileId)) {
     throw new Error('Invalid profileId');
@@ -254,7 +281,7 @@ async function writeState(bucket, appId, incoming) {
     });
   }
 
-  await maybeRotateDailyBackup(bucket, appId, existing.revision > 0 ? existing : next);
+  await maybeRotateDailyBackup(bucket, appId, existing.revision > 0 ? existing : next, backupAIntervalMs);
   await writeObject(bucket, getStateKey(appId), next);
   await writeObject(bucket, getBackupKey(appId, 'b'), {
     ...next,
@@ -286,14 +313,23 @@ export default {
     }
 
     if (backupRoute) {
+      if (request.method === 'GET') {
+        const backup = await readBackup(env.EXTENSION_BUCKET, appId, backupRoute.slot);
+        if (!backup) {
+          return errorResponse('Backup not found', 404);
+        }
+        return jsonResponse(backup);
+      }
+      if (request.method === 'PUT' && backupRoute.slot === 'a') {
+        try {
+          return jsonResponse(await writeBackup(env.EXTENSION_BUCKET, appId, backupRoute.slot));
+        } catch (err) {
+          return errorResponse(err.message || 'Backup write failed', err.status || 400);
+        }
+      }
       if (request.method !== 'GET') {
         return errorResponse('Method not allowed', 405);
       }
-      const backup = await readBackup(env.EXTENSION_BUCKET, appId, backupRoute.slot);
-      if (!backup) {
-        return errorResponse('Backup not found', 404);
-      }
-      return jsonResponse(backup);
     }
 
     if (request.method === 'GET') {

@@ -37,7 +37,8 @@ export function getDomRefs() {
         settingsClose: document.getElementById('settings-close'),
         syncWorkerUrlInput: document.getElementById('setting-sync-worker-url'),
         syncApiCodeInput: document.getElementById('setting-sync-api-code'),
-        syncDelaySelect: document.getElementById('setting-sync-delay'),
+        syncDelayInput: document.getElementById('setting-sync-delay'),
+        syncBackupAIntervalInput: document.getElementById('setting-sync-a-hours'),
         syncProfileSelect: {
             get value() { return getRadioVal('sync-profile'); },
             set value(val) { setRadioVal('sync-profile', val); },
@@ -54,6 +55,7 @@ export function getDomRefs() {
         syncPull: document.getElementById('sync-pull'),
         syncRestoreA: document.getElementById('sync-restore-a'),
         syncRestoreB: document.getElementById('sync-restore-b'),
+        syncLiveStatus: document.getElementById('sync-live-status'),
         syncStatus: document.getElementById('sync-status')
     };
 }

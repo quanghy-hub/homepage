@@ -25,8 +25,10 @@ apps/homepage/state.v1.json
 This lets `macbook` and `mobile` use different pinned groups and UI sizing
 while still sharing the same groups and links.
 
-Backup `b` is updated on every successful write. Backup `a` is a daily safety
-snapshot taken from the previous live state before the new write is saved.
+Backup `b` is updated on every successful write. Backup `a` is a safety
+snapshot taken from the previous live state before the new write is saved,
+using the client-provided `backupAIntervalHours` value, clamped from 1 to 24
+hours. `PUT /sync/:appId/backup/a` forces an immediate A snapshot.
 
 ## Deploy
 

@@ -5,8 +5,24 @@ export const SYNC_APP_ID = 'homepage';
 export const DEFAULT_WORKER_URL = 'https://extension.quavav15-6.workers.dev';
 export const PROFILE_IDS = ['macbook', 'mobile'];
 export const BACKUP_SLOTS = ['a', 'b'];
-export const SYNC_DELAY_SECONDS = [5, 10, 30, 60];
 export const DEFAULT_SYNC_DELAY_SECONDS = 5;
+export const DEFAULT_BACKUP_A_INTERVAL_HOURS = 24;
+const MIN_SYNC_DELAY_SECONDS = 1;
+const MAX_SYNC_DELAY_SECONDS = 3600;
+const MIN_BACKUP_A_INTERVAL_HOURS = 1;
+const MAX_BACKUP_A_INTERVAL_HOURS = 24;
+
+function normalizeDelaySeconds(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return DEFAULT_SYNC_DELAY_SECONDS;
+    return Math.min(MAX_SYNC_DELAY_SECONDS, Math.max(MIN_SYNC_DELAY_SECONDS, Math.round(parsed)));
+}
+
+function normalizeBackupAIntervalHours(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return DEFAULT_BACKUP_A_INTERVAL_HOURS;
+    return Math.min(MAX_BACKUP_A_INTERVAL_HOURS, Math.max(MIN_BACKUP_A_INTERVAL_HOURS, Math.round(parsed)));
+}
 
 export function setSyncStatus(dom, msg, type = '') {
     dom.syncStatus.textContent = msg;
@@ -25,10 +41,9 @@ export function getSyncSettings(dom) {
     const profileId = PROFILE_IDS.includes(dom.syncProfileSelect.value)
         ? dom.syncProfileSelect.value
         : DEFAULT_PROFILE_ID;
-    const delaySeconds = SYNC_DELAY_SECONDS.includes(Number(dom.syncDelaySelect?.value))
-        ? Number(dom.syncDelaySelect.value)
-        : DEFAULT_SYNC_DELAY_SECONDS;
-    return { workerUrl, apiCode, profileId, syncMode: 'auto', delaySeconds };
+    const delaySeconds = normalizeDelaySeconds(dom.syncDelayInput?.value);
+    const backupAIntervalHours = normalizeBackupAIntervalHours(dom.syncBackupAIntervalInput?.value);
+    return { workerUrl, apiCode, profileId, syncMode: 'auto', delaySeconds, backupAIntervalHours };
 }
 
 export function getStateEndpoint(workerUrl) {
@@ -86,13 +101,23 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
         if (onProfileChange) onProfileChange(profileId);
     });
 
-    dom.syncDelaySelect?.addEventListener('change', () => {
-        const delaySeconds = SYNC_DELAY_SECONDS.includes(Number(dom.syncDelaySelect.value))
-            ? Number(dom.syncDelaySelect.value)
-            : DEFAULT_SYNC_DELAY_SECONDS;
+    const saveSyncDelay = () => {
+        const delaySeconds = normalizeDelaySeconds(dom.syncDelayInput?.value);
+        if (dom.syncDelayInput) dom.syncDelayInput.value = String(delaySeconds);
         chrome.storage.local.set({ [STORAGE_KEYS.syncDelaySeconds]: delaySeconds });
         if (onConfigChange) onConfigChange();
-    });
+    };
+    dom.syncDelayInput?.addEventListener('change', saveSyncDelay);
+    dom.syncDelayInput?.addEventListener('blur', saveSyncDelay);
+
+    const saveBackupAInterval = () => {
+        const intervalHours = normalizeBackupAIntervalHours(dom.syncBackupAIntervalInput?.value);
+        if (dom.syncBackupAIntervalInput) dom.syncBackupAIntervalInput.value = String(intervalHours);
+        chrome.storage.local.set({ [STORAGE_KEYS.syncBackupAIntervalHours]: intervalHours });
+        if (onConfigChange) onConfigChange();
+    };
+    dom.syncBackupAIntervalInput?.addEventListener('change', saveBackupAInterval);
+    dom.syncBackupAIntervalInput?.addEventListener('blur', saveBackupAInterval);
 
     chrome.storage.local.set({ [STORAGE_KEYS.syncMode]: 'auto' });
 }
@@ -102,7 +127,8 @@ export function loadSavedSyncCredentials(dom) {
         STORAGE_KEYS.syncWorkerUrl,
         STORAGE_KEYS.syncApiCode,
         STORAGE_KEYS.syncProfile,
-        STORAGE_KEYS.syncDelaySeconds
+        STORAGE_KEYS.syncDelaySeconds,
+        STORAGE_KEYS.syncBackupAIntervalHours
     ], result => {
         dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
         dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
@@ -110,11 +136,13 @@ export function loadSavedSyncCredentials(dom) {
             ? result[STORAGE_KEYS.syncProfile]
             : DEFAULT_PROFILE_ID;
         if (dom.syncModeSelect) dom.syncModeSelect.value = 'auto';
-        if (dom.syncDelaySelect) {
+        if (dom.syncDelayInput) {
             const savedDelay = Number(result[STORAGE_KEYS.syncDelaySeconds]);
-            dom.syncDelaySelect.value = String(
-                SYNC_DELAY_SECONDS.includes(savedDelay) ? savedDelay : DEFAULT_SYNC_DELAY_SECONDS
-            );
+            dom.syncDelayInput.value = String(normalizeDelaySeconds(savedDelay));
+        }
+        if (dom.syncBackupAIntervalInput) {
+            const savedInterval = Number(result[STORAGE_KEYS.syncBackupAIntervalHours]);
+            dom.syncBackupAIntervalInput.value = String(normalizeBackupAIntervalHours(savedInterval));
         }
     });
 }
@@ -145,12 +173,13 @@ export function saveSyncReady(isReady) {
     chrome.storage.local.set({ [STORAGE_KEYS.syncReady]: isReady === true });
 }
 
-export function buildExportData(state, baseRevision = null) {
+export function buildExportData(state, baseRevision = null, options = {}) {
     return {
         version: 1,
         appId: SYNC_APP_ID,
         profileId: state.profileId,
         baseRevision,
+        backupAIntervalHours: normalizeBackupAIntervalHours(options.backupAIntervalHours),
         links: state.links,
         groups: {
             list: state.groups.list
@@ -206,12 +235,33 @@ export async function pullCloudflareBackup(dom, slot) {
     return res.json();
 }
 
+export async function pushCloudflareBackup(dom, slot) {
+    const normalizedSlot = String(slot || '').toLowerCase();
+    if (!BACKUP_SLOTS.includes(normalizedSlot)) {
+        throw new Error('Invalid backup slot');
+    }
+    const config = getSyncSettings(dom);
+    const endpoint = getBackupEndpoint(config.workerUrl, normalizedSlot);
+    const headers = getSyncHeaders(config.apiCode);
+
+    if (!config.workerUrl) throw new Error('Please enter Worker URL first');
+    if (!headers) throw new Error('Please enter API code first');
+
+    const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    return res.json();
+}
+
 export async function pushCloudflareState(dom, state, baseRevision = null) {
-    const { endpoint, headers } = buildConfiguredSync(dom);
+    const { endpoint, headers, backupAIntervalHours } = buildConfiguredSync(dom);
     const putState = async revision => fetch(endpoint, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(buildExportData(state, revision))
+        body: JSON.stringify(buildExportData(state, revision, { backupAIntervalHours }))
     });
 
     let res = await putState(baseRevision);
