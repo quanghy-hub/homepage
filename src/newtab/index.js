@@ -421,7 +421,6 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     settingsOverlay.classList.remove('hidden');
     refreshSettingsControls();
     syncController.loadSavedCredentials();
-    syncController.setVerifyStatus('');
   }
 
   function closeSettings() {

@@ -46,6 +46,21 @@ export function createSyncController({
     if (dom.syncLiveStatus) dom.syncLiveStatus.textContent = msg;
   }
 
+  function formatSyncStamp(date = new Date()) {
+    return date.toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  }
+
+  function revisionText(revision = getRevision()) {
+    return Number.isSafeInteger(revision) ? `revision ${revision}` : 'revision -';
+  }
+
   function applyRemoteState(imported) {
     applyImportedState(imported);
     if (Number.isSafeInteger(imported?.revision)) {
@@ -66,7 +81,7 @@ export function createSyncController({
     refreshSettingsControls();
 
     if (showStatus) {
-      setSyncStatus('✓ Pulled successfully · ' + new Date().toLocaleTimeString(), 'ok');
+      setSyncStatus(`✓ Pulled successfully · ${revisionText(imported.revision)} · ${formatSyncStamp()}`, 'ok');
     }
   }
 
@@ -75,8 +90,9 @@ export function createSyncController({
     if (showStatus) setSyncStatus('Pushing to B...');
 
     isPushing = true;
+    let updated;
     try {
-      const updated = await pushCloudflareState(dom, getState(), getRevision());
+      updated = await pushCloudflareState(dom, getState(), getRevision());
       applyRemoteState(updated);
       syncReady = true;
       saveSyncReady(true);
@@ -87,14 +103,15 @@ export function createSyncController({
     }
 
     if (showStatus) {
-      setSyncStatus('✓ B synced · ' + new Date().toLocaleTimeString(), 'ok');
+      setSyncStatus(`✓ B synced · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
     }
+    return updated;
   }
 
   async function pushBackupA() {
     setSyncStatus('Syncing A...');
     const backup = await pushCloudflareBackup(dom, 'a');
-    setSyncStatus('✓ A synced · ' + new Date().toLocaleTimeString(), 'ok');
+    setSyncStatus(`✓ A synced · ${revisionText(backup?.revision)} · ${formatSyncStamp()}`, 'ok');
     return backup;
   }
 
@@ -111,7 +128,7 @@ export function createSyncController({
     const updated = await pushCloudflareState(dom, getState(), getRevision());
     applyRemoteState(updated);
     saveData({ skipAutoSync: true });
-    setSyncStatus(`✓ Restored backup ${label} · ` + new Date().toLocaleTimeString(), 'ok');
+    setSyncStatus(`✓ Restored backup ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
   }
 
   function scheduleAutoSync() {
@@ -140,8 +157,8 @@ export function createSyncController({
       autoSyncTimer = null;
       try {
         setLiveStatus('B syncing...');
-        await pushToCloudflare(false);
-        setLiveStatus('B synced ' + new Date().toLocaleTimeString());
+        const updated = await pushToCloudflare(false);
+        setLiveStatus(`B synced · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`);
       } catch (err) {
         setLiveStatus('B error');
         setSyncStatus('✗ Auto sync error: ' + err.message, 'err');
@@ -167,7 +184,7 @@ export function createSyncController({
       render();
       refreshSettingsControls();
 
-      const msg = 'B restored ' + new Date().toLocaleTimeString();
+      const msg = `B restored · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`;
       setLiveStatus(msg);
       if (showStatus) setSyncStatus('✓ ' + msg, 'ok');
       return true;
@@ -197,11 +214,13 @@ export function createSyncController({
         saveData({ skipAutoSync: true });
         render();
         refreshSettingsControls();
-        setLiveStatus('B restored ' + new Date().toLocaleTimeString());
+        setLiveStatus(`B restored · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`);
       } else {
         setRevision(remoteRevision);
         saveSyncRevision(remoteRevision);
-        setLiveStatus(remoteRevision > 0 ? 'B ready' : 'B ready · empty cloud');
+        setLiveStatus(remoteRevision > 0
+          ? `B ready · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`
+          : `B ready · empty cloud · ${formatSyncStamp()}`);
       }
 
       syncReady = true;
@@ -269,7 +288,7 @@ export function createSyncController({
 
         await bootstrapCloud();
         const remote = await verifyCloudflareSync(dom);
-        setVerifyStatus(`✓ Connected to Worker successfully · revision ${remote.revision || 0}`, 'ok');
+        setVerifyStatus(`✓ Connected to Worker successfully · ${revisionText(remote.revision || 0)} · ${formatSyncStamp()}`, 'ok');
         startAutoRestore();
       } catch (err) {
         setVerifyStatus('✗ Connection failed · ' + err.message, 'err');
