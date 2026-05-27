@@ -31,6 +31,7 @@ export function createSyncController({
   let autoRestoreTimer = null;
   let isPushing = false;
   let isRestoring = false;
+  let isBootstrapping = false;
   let syncReady = false;
 
   function setSyncStatus(msg, type = '') {
@@ -120,6 +121,18 @@ export function createSyncController({
       setLiveStatus('B paused: missing sync config');
       return;
     }
+    if (!syncReady) {
+      setLiveStatus('B checking cloud first...');
+      bootstrapCloud()
+        .then(isReady => {
+          if (isReady) scheduleAutoSync();
+        })
+        .catch(err => {
+          setLiveStatus('B check error');
+          setSyncStatus('✗ Cloud check error: ' + err.message, 'err');
+        });
+      return;
+    }
     const delayMs = Math.max(1, config.delaySeconds || 5) * 1000;
     setLiveStatus(`B in ${config.delaySeconds || 5}s`);
 
@@ -163,6 +176,42 @@ export function createSyncController({
     }
   }
 
+  async function bootstrapCloud() {
+    if (syncReady || isBootstrapping) return syncReady;
+
+    const config = getSyncSettings(dom);
+    if (!config.workerUrl || !config.apiCode) {
+      setLiveStatus('B paused: missing sync config');
+      return false;
+    }
+
+    isBootstrapping = true;
+    try {
+      setLiveStatus('B checking cloud...');
+      const remote = await pullCloudflareState(dom);
+      const remoteRevision = Number.isSafeInteger(remote?.revision) ? remote.revision : 0;
+      const localRevision = Number.isSafeInteger(getRevision()) ? getRevision() : 0;
+
+      if (remoteRevision > 0 && remoteRevision > localRevision) {
+        applyRemoteState(remote);
+        saveData({ skipAutoSync: true });
+        render();
+        refreshSettingsControls();
+        setLiveStatus('B restored ' + new Date().toLocaleTimeString());
+      } else {
+        setRevision(remoteRevision);
+        saveSyncRevision(remoteRevision);
+        setLiveStatus(remoteRevision > 0 ? 'B ready' : 'B ready · empty cloud');
+      }
+
+      syncReady = true;
+      saveSyncReady(true);
+      return true;
+    } finally {
+      isBootstrapping = false;
+    }
+  }
+
   function startAutoRestore() {
     clearInterval(autoRestoreTimer);
     const config = getSyncSettings(dom);
@@ -196,7 +245,12 @@ export function createSyncController({
       onConfigChange: () => {
         syncReady = false;
         setLiveStatus('settings updated');
-        startAutoRestore();
+        bootstrapCloud()
+          .then(() => startAutoRestore())
+          .catch(err => {
+            setLiveStatus('B check error');
+            setSyncStatus('✗ Cloud check error: ' + err.message, 'err');
+          });
       },
       onDelayChange: (delaySeconds) => {
         setLiveStatus(`delay updated to ${delaySeconds}s`);
@@ -210,18 +264,9 @@ export function createSyncController({
         dom.verifySyncBtn.disabled = true;
         setVerifyStatus('Testing connection...');
 
-        const restored = await restoreLatestFromB(false);
-        if (restored) {
-          setVerifyStatus('✓ Connected and restored latest B', 'ok');
-        } else {
-          const remote = await verifyCloudflareSync(dom);
-          if (Number.isSafeInteger(remote.revision)) {
-            saveSyncRevision(remote.revision);
-          }
-          syncReady = true;
-          saveSyncReady(true);
-          setVerifyStatus('✓ Connected to Worker successfully', 'ok');
-        }
+        await bootstrapCloud();
+        const remote = await verifyCloudflareSync(dom);
+        setVerifyStatus(`✓ Connected to Worker successfully · revision ${remote.revision || 0}`, 'ok');
         startAutoRestore();
       } catch (err) {
         setVerifyStatus('✗ Connection failed · ' + err.message, 'err');
@@ -284,6 +329,7 @@ export function createSyncController({
     },
     loadSavedRevision: loadSavedSyncRevision,
     scheduleAutoSync,
+    bootstrapCloud,
     refreshStatus,
     startAutoRestore,
     setVerifyStatus,
