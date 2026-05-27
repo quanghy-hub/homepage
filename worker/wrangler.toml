@@ -6,3 +6,6 @@ workers_dev = true
 [[r2_buckets]]
 binding = "EXTENSION_BUCKET"
 bucket_name = "extension-sync"
+
+[triggers]
+crons = ["0 * * * *"]

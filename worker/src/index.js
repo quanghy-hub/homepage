@@ -1,7 +1,6 @@
 const STATE_VERSION = 1;
-const DAILY_BACKUP_MS = 24 * 60 * 60 * 1000;
-const MIN_BACKUP_A_INTERVAL_HOURS = 1;
-const MAX_BACKUP_A_INTERVAL_HOURS = 24;
+const DEFAULT_BACKUP_A_HOUR = 1;
+const DEFAULT_BACKUP_A_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 const APP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const BACKUP_SLOT_PATTERN = /^[ab]$/;
 
@@ -88,11 +87,38 @@ function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
-function normalizeBackupAIntervalMs(value) {
-  const hours = Number(value);
-  if (!Number.isFinite(hours)) return DAILY_BACKUP_MS;
-  const safeHours = Math.min(MAX_BACKUP_A_INTERVAL_HOURS, Math.max(MIN_BACKUP_A_INTERVAL_HOURS, Math.round(hours)));
-  return safeHours * 60 * 60 * 1000;
+function normalizeBackupAHour(value) {
+  const hour = Number(value);
+  if (!Number.isFinite(hour)) return DEFAULT_BACKUP_A_HOUR;
+  return Math.min(23, Math.max(0, Math.round(hour)));
+}
+
+function normalizeTimeZone(value) {
+  const timeZone = typeof value === 'string' && value ? value : DEFAULT_BACKUP_A_TIME_ZONE;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+    return timeZone;
+  } catch {
+    return DEFAULT_BACKUP_A_TIME_ZONE;
+  }
+}
+
+function getLocalDateParts(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false
+  }).formatToParts(date);
+  const value = name => parts.find(part => part.type === name)?.value || '';
+  const hour = Number(value('hour')) % 24;
+
+  return {
+    dateKey: `${value('year')}-${value('month')}-${value('day')}`,
+    hour
+  };
 }
 
 function normalizeSession(session, index) {
@@ -169,8 +195,11 @@ function normalizeStoredState(value, appId) {
     profiles,
     revision: Number.isSafeInteger(state.revision) ? state.revision : 0,
     updatedAt: typeof state.updatedAt === 'string' ? state.updatedAt : null,
+    backupAHour: normalizeBackupAHour(state.backupAHour),
+    backupATimeZone: normalizeTimeZone(state.backupATimeZone),
     backupSlot: typeof state.backupSlot === 'string' ? state.backupSlot : null,
-    backupUpdatedAt: typeof state.backupUpdatedAt === 'string' ? state.backupUpdatedAt : null
+    backupUpdatedAt: typeof state.backupUpdatedAt === 'string' ? state.backupUpdatedAt : null,
+    backupADateKey: typeof state.backupADateKey === 'string' ? state.backupADateKey : null
   };
 }
 
@@ -196,18 +225,21 @@ async function readBackup(bucket, appId, slot) {
   }
 }
 
-async function writeBackup(bucket, appId, slot) {
-  const current = await readState(bucket, appId);
+async function writeBackup(bucket, appId, slot, sourceState = null, now = new Date()) {
+  const current = sourceState || await readState(bucket, appId);
   if (!current || current.revision <= 0) {
     const err = new Error('State not found');
     err.status = 404;
     throw err;
   }
+  const timeZone = normalizeTimeZone(current.backupATimeZone);
+  const { dateKey } = getLocalDateParts(now, timeZone);
 
   const backup = {
     ...current,
     backupSlot: slot,
-    backupUpdatedAt: new Date().toISOString()
+    backupUpdatedAt: now.toISOString(),
+    backupADateKey: slot === 'a' ? dateKey : current.backupADateKey
   };
   await writeObject(bucket, getBackupKey(appId, slot), backup);
   return backup;
@@ -221,18 +253,16 @@ async function writeObject(bucket, key, state) {
   });
 }
 
-async function maybeRotateDailyBackup(bucket, appId, snapshot, intervalMs = DAILY_BACKUP_MS) {
+async function maybeRunScheduledBackupA(bucket, appId, snapshot, now = new Date()) {
   const existingBackup = await readBackup(bucket, appId, 'a');
-  const lastUpdated = existingBackup?.backupUpdatedAt ? Date.parse(existingBackup.backupUpdatedAt) : 0;
-  if (existingBackup && Number.isFinite(lastUpdated) && Date.now() - lastUpdated < intervalMs) {
+  const timeZone = normalizeTimeZone(snapshot.backupATimeZone);
+  const { dateKey, hour } = getLocalDateParts(now, timeZone);
+  if (hour !== normalizeBackupAHour(snapshot.backupAHour)) {
     return;
   }
+  if (existingBackup?.backupADateKey === dateKey) return;
 
-  await writeObject(bucket, getBackupKey(appId, 'a'), {
-    ...snapshot,
-    backupSlot: 'a',
-    backupUpdatedAt: new Date().toISOString()
-  });
+  await writeBackup(bucket, appId, 'a', snapshot, now);
 }
 
 async function writeState(bucket, appId, incoming) {
@@ -240,7 +270,8 @@ async function writeState(bucket, appId, incoming) {
   const payload = asObject(incoming);
   const groups = asObject(payload.groups);
   const profileId = String(payload.profileId || '').toLowerCase();
-  const backupAIntervalMs = normalizeBackupAIntervalMs(payload.backupAIntervalHours);
+  const backupAHour = normalizeBackupAHour(payload.backupAHour ?? existing.backupAHour);
+  const backupATimeZone = normalizeTimeZone(payload.backupATimeZone || existing.backupATimeZone);
 
   if (profileId && !APP_ID_PATTERN.test(profileId)) {
     throw new Error('Invalid profileId');
@@ -268,7 +299,9 @@ async function writeState(bucket, appId, incoming) {
       : existing.groups,
     profiles: { ...existing.profiles },
     revision: existing.revision + 1,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    backupAHour,
+    backupATimeZone
   };
 
   if (profileId) {
@@ -281,18 +314,45 @@ async function writeState(bucket, appId, incoming) {
     });
   }
 
-  await maybeRotateDailyBackup(bucket, appId, existing.revision > 0 ? existing : next, backupAIntervalMs);
   await writeObject(bucket, getStateKey(appId), next);
-  await writeObject(bucket, getBackupKey(appId, 'b'), {
-    ...next,
-    backupSlot: 'b',
-    backupUpdatedAt: new Date().toISOString()
-  });
+  await writeBackup(bucket, appId, 'b', next);
+  await maybeRunScheduledBackupA(bucket, appId, next);
 
   return next;
 }
 
+async function listAppIds(bucket) {
+  const ids = new Set();
+  let cursor;
+  do {
+    const listed = await bucket.list({ prefix: 'apps/', cursor });
+    asArray(listed.objects).forEach(object => {
+      const match = object.key.match(/^apps\/([^/]+)\/state\.v1\.json$/);
+      if (match && APP_ID_PATTERN.test(match[1])) ids.add(match[1]);
+    });
+    cursor = listed.truncated ? listed.cursor : null;
+  } while (cursor);
+  return [...ids];
+}
+
+async function runScheduledBackups(bucket, now = new Date()) {
+  const appIds = await listAppIds(bucket);
+  const results = [];
+  for (const appId of appIds) {
+    const state = await readState(bucket, appId);
+    if (state.revision > 0) {
+      await maybeRunScheduledBackupA(bucket, appId, state, now);
+      results.push(appId);
+    }
+  }
+  return results;
+}
+
 export default {
+  async scheduled(_event, env, _ctx) {
+    await runScheduledBackups(env.EXTENSION_BUCKET);
+  },
+
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS_HEADERS });

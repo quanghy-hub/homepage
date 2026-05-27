@@ -6,11 +6,11 @@ export const DEFAULT_WORKER_URL = 'https://extension.quavav15-6.workers.dev';
 export const PROFILE_IDS = ['macbook', 'mobile'];
 export const BACKUP_SLOTS = ['a', 'b'];
 export const DEFAULT_SYNC_DELAY_SECONDS = 5;
-export const DEFAULT_BACKUP_A_INTERVAL_HOURS = 24;
+export const DEFAULT_BACKUP_A_HOUR = 1;
 const MIN_SYNC_DELAY_SECONDS = 1;
 const MAX_SYNC_DELAY_SECONDS = 3600;
-const MIN_BACKUP_A_INTERVAL_HOURS = 1;
-const MAX_BACKUP_A_INTERVAL_HOURS = 24;
+const MIN_BACKUP_A_HOUR = 0;
+const MAX_BACKUP_A_HOUR = 23;
 
 function normalizeDelaySeconds(value) {
     const parsed = Number(value);
@@ -18,10 +18,10 @@ function normalizeDelaySeconds(value) {
     return Math.min(MAX_SYNC_DELAY_SECONDS, Math.max(MIN_SYNC_DELAY_SECONDS, Math.round(parsed)));
 }
 
-function normalizeBackupAIntervalHours(value) {
+function normalizeBackupAHour(value) {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return DEFAULT_BACKUP_A_INTERVAL_HOURS;
-    return Math.min(MAX_BACKUP_A_INTERVAL_HOURS, Math.max(MIN_BACKUP_A_INTERVAL_HOURS, Math.round(parsed)));
+    if (!Number.isFinite(parsed)) return DEFAULT_BACKUP_A_HOUR;
+    return Math.min(MAX_BACKUP_A_HOUR, Math.max(MIN_BACKUP_A_HOUR, Math.round(parsed)));
 }
 
 export function setSyncStatus(dom, msg, type = '') {
@@ -42,8 +42,9 @@ export function getSyncSettings(dom) {
         ? dom.syncProfileSelect.value
         : DEFAULT_PROFILE_ID;
     const delaySeconds = normalizeDelaySeconds(dom.syncDelayInput?.value);
-    const backupAIntervalHours = normalizeBackupAIntervalHours(dom.syncBackupAIntervalInput?.value);
-    return { workerUrl, apiCode, profileId, syncMode: 'auto', delaySeconds, backupAIntervalHours };
+    const backupAHour = normalizeBackupAHour(dom.syncBackupAHourInput?.value);
+    const backupATimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    return { workerUrl, apiCode, profileId, syncMode: 'auto', delaySeconds, backupAHour, backupATimeZone };
 }
 
 export function getStateEndpoint(workerUrl) {
@@ -110,14 +111,14 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
     dom.syncDelayInput?.addEventListener('change', saveSyncDelay);
     dom.syncDelayInput?.addEventListener('blur', saveSyncDelay);
 
-    const saveBackupAInterval = () => {
-        const intervalHours = normalizeBackupAIntervalHours(dom.syncBackupAIntervalInput?.value);
-        if (dom.syncBackupAIntervalInput) dom.syncBackupAIntervalInput.value = String(intervalHours);
-        chrome.storage.local.set({ [STORAGE_KEYS.syncBackupAIntervalHours]: intervalHours });
+    const saveBackupAHour = () => {
+        const backupAHour = normalizeBackupAHour(dom.syncBackupAHourInput?.value);
+        if (dom.syncBackupAHourInput) dom.syncBackupAHourInput.value = String(backupAHour);
+        chrome.storage.local.set({ [STORAGE_KEYS.syncBackupAHour]: backupAHour });
         if (onConfigChange) onConfigChange();
     };
-    dom.syncBackupAIntervalInput?.addEventListener('change', saveBackupAInterval);
-    dom.syncBackupAIntervalInput?.addEventListener('blur', saveBackupAInterval);
+    dom.syncBackupAHourInput?.addEventListener('change', saveBackupAHour);
+    dom.syncBackupAHourInput?.addEventListener('blur', saveBackupAHour);
 
     chrome.storage.local.set({ [STORAGE_KEYS.syncMode]: 'auto' });
 }
@@ -128,7 +129,7 @@ export function loadSavedSyncCredentials(dom) {
         STORAGE_KEYS.syncApiCode,
         STORAGE_KEYS.syncProfile,
         STORAGE_KEYS.syncDelaySeconds,
-        STORAGE_KEYS.syncBackupAIntervalHours
+        STORAGE_KEYS.syncBackupAHour
     ], result => {
         dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
         dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
@@ -140,9 +141,9 @@ export function loadSavedSyncCredentials(dom) {
             const savedDelay = Number(result[STORAGE_KEYS.syncDelaySeconds]);
             dom.syncDelayInput.value = String(normalizeDelaySeconds(savedDelay));
         }
-        if (dom.syncBackupAIntervalInput) {
-            const savedInterval = Number(result[STORAGE_KEYS.syncBackupAIntervalHours]);
-            dom.syncBackupAIntervalInput.value = String(normalizeBackupAIntervalHours(savedInterval));
+        if (dom.syncBackupAHourInput) {
+            const savedHour = Number(result[STORAGE_KEYS.syncBackupAHour]);
+            dom.syncBackupAHourInput.value = String(normalizeBackupAHour(savedHour));
         }
     });
 }
@@ -179,7 +180,8 @@ export function buildExportData(state, baseRevision = null, options = {}) {
         appId: SYNC_APP_ID,
         profileId: state.profileId,
         baseRevision,
-        backupAIntervalHours: normalizeBackupAIntervalHours(options.backupAIntervalHours),
+        backupAHour: normalizeBackupAHour(options.backupAHour),
+        backupATimeZone: options.backupATimeZone || 'UTC',
         links: state.links,
         groups: {
             list: state.groups.list
@@ -257,11 +259,11 @@ export async function pushCloudflareBackup(dom, slot) {
 }
 
 export async function pushCloudflareState(dom, state, baseRevision = null) {
-    const { endpoint, headers, backupAIntervalHours } = buildConfiguredSync(dom);
+    const { endpoint, headers, backupAHour, backupATimeZone } = buildConfiguredSync(dom);
     const putState = async revision => fetch(endpoint, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(buildExportData(state, revision, { backupAIntervalHours }))
+        body: JSON.stringify(buildExportData(state, revision, { backupAHour, backupATimeZone }))
     });
 
     let res = await putState(baseRevision);

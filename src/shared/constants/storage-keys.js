@@ -8,7 +8,7 @@ export const STORAGE_KEYS = {
     syncProfile: 'syncProfile',
     syncMode: 'syncMode',
     syncDelaySeconds: 'syncDelaySeconds',
-    syncBackupAIntervalHours: 'syncBackupAIntervalHours',
+    syncBackupAHour: 'syncBackupAHour',
     syncReady: 'syncReady',
     syncRevision: 'syncRevision',
     recentPage: 'recentPage',
