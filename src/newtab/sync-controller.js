@@ -11,7 +11,6 @@ import {
   saveSyncReady,
   pushCloudflareState,
   saveSyncRevision,
-  setLiveStatus as updateLiveStatus,
   setSyncStatus as updateSyncStatus,
   setVerifyStatus as updateVerifyStatus,
   verifyCloudflareSync
@@ -42,10 +41,6 @@ export function createSyncController({
 
   function setVerifyStatus(msg, type = '') {
     updateVerifyStatus(dom, msg, type);
-  }
-
-  function setLiveStatus(msg) {
-    updateLiveStatus(dom, msg);
   }
 
   function formatSyncStamp(date = new Date()) {
@@ -137,32 +132,26 @@ export function createSyncController({
     clearTimeout(autoSyncTimer);
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) {
-      setLiveStatus('B paused: missing sync config');
       return;
     }
     if (!syncReady) {
-      setLiveStatus('B checking cloud first...');
       bootstrapCloud()
         .then(isReady => {
           if (isReady) scheduleAutoSync();
         })
         .catch(err => {
-          setLiveStatus('B check error');
           setSyncStatus('✗ Cloud check error: ' + err.message, 'err');
         });
       return;
     }
     const delayMs = Math.max(1, config.delaySeconds || 5) * 1000;
-    setLiveStatus(`B in ${config.delaySeconds || 5}s`);
 
     autoSyncTimer = setTimeout(async () => {
       autoSyncTimer = null;
       try {
-        setLiveStatus('B syncing...');
         const updated = await pushToCloudflare(false);
-        setLiveStatus(`B synced · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`);
+        setSyncStatus(`✓ B synced · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
       } catch (err) {
-        setLiveStatus('B error');
         setSyncStatus('✗ Auto sync error: ' + err.message, 'err');
       }
     }, delayMs);
@@ -187,8 +176,7 @@ export function createSyncController({
       refreshSettingsControls();
 
       const msg = `B restored · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`;
-      setLiveStatus(msg);
-      if (showStatus) setSyncStatus('✓ ' + msg, 'ok');
+      setSyncStatus('✓ ' + msg, 'ok');
       return true;
     } finally {
       isRestoring = false;
@@ -200,13 +188,11 @@ export function createSyncController({
 
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) {
-      setLiveStatus('B paused: missing sync config');
       return false;
     }
 
     isBootstrapping = true;
     try {
-      setLiveStatus('B checking cloud...');
       const remote = await pullCloudflareState(dom);
       const remoteRevision = Number.isSafeInteger(remote?.revision) ? remote.revision : 0;
       const localRevision = Number.isSafeInteger(getRevision()) ? getRevision() : 0;
@@ -216,13 +202,10 @@ export function createSyncController({
         saveData({ skipAutoSync: true });
         render();
         refreshSettingsControls();
-        setLiveStatus(`B restored · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`);
+        setSyncStatus(`✓ B restored · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`, 'ok');
       } else {
         setRevision(remoteRevision);
         saveSyncRevision(remoteRevision);
-        setLiveStatus(remoteRevision > 0
-          ? `B ready · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`
-          : `B ready · empty cloud · ${formatSyncStamp()}`);
       }
 
       syncReady = true;
@@ -245,19 +228,12 @@ export function createSyncController({
     autoRestoreTimer = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
       restoreLatestFromB(false).catch(err => {
-        setLiveStatus('B restore error');
         setSyncStatus('✗ Auto restore error: ' + err.message, 'err');
       });
     }, intervalMs);
   }
 
   function refreshStatus() {
-    const config = getSyncSettings(dom);
-    if (!config.workerUrl || !config.apiCode) {
-      setLiveStatus('B paused: missing sync config');
-      return;
-    }
-    setLiveStatus(`B ready · ${config.delaySeconds || 5}s`);
   }
 
   function bind() {
@@ -265,17 +241,14 @@ export function createSyncController({
       onProfileChange: switchProfile,
       onConfigChange: () => {
         syncReady = false;
-        setLiveStatus('settings updated');
         bootstrapCloud()
           .then(() => startAutoRestore())
           .catch(err => {
-            setLiveStatus('B check error');
             setSyncStatus('✗ Cloud check error: ' + err.message, 'err');
           });
       },
       onDelayChange: (delaySeconds) => {
         const hasPendingPush = !!autoSyncTimer;
-        setLiveStatus(`delay updated to ${delaySeconds}s`);
         startAutoRestore();
         if (hasPendingPush) {
           scheduleAutoSync();

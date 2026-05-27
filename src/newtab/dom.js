@@ -54,7 +54,6 @@ export function getDomRefs() {
         syncPull: document.getElementById('sync-pull'),
         syncRestoreA: document.getElementById('sync-restore-a'),
         syncRestoreB: document.getElementById('sync-restore-b'),
-        syncLiveStatus: document.getElementById('sync-live-status'),
         syncStatus: document.getElementById('sync-status')
     };
 }

@@ -34,20 +34,13 @@ export function setVerifyStatus(dom, msg, type = '') {
     });
 }
 
-export function setLiveStatus(dom, msg) {
-    if (!dom.syncLiveStatus) return;
-    dom.syncLiveStatus.textContent = msg;
-    chrome.storage.local.set({ [STORAGE_KEYS.syncLiveStatus]: msg });
-}
-
 export function loadSavedSyncStatuses(dom) {
     return new Promise(resolve => {
         chrome.storage.local.get([
             STORAGE_KEYS.syncStatus,
             STORAGE_KEYS.syncStatusType,
             STORAGE_KEYS.syncVerifyStatus,
-            STORAGE_KEYS.syncVerifyStatusType,
-            STORAGE_KEYS.syncLiveStatus
+            STORAGE_KEYS.syncVerifyStatusType
         ], result => {
             if (result[STORAGE_KEYS.syncStatus]) {
                 dom.syncStatus.textContent = result[STORAGE_KEYS.syncStatus];
@@ -56,9 +49,6 @@ export function loadSavedSyncStatuses(dom) {
             if (dom.syncVerifyStatus && result[STORAGE_KEYS.syncVerifyStatus]) {
                 dom.syncVerifyStatus.textContent = result[STORAGE_KEYS.syncVerifyStatus];
                 dom.syncVerifyStatus.className = 'sync-status' + (result[STORAGE_KEYS.syncVerifyStatusType] ? ' ' + result[STORAGE_KEYS.syncVerifyStatusType] : '');
-            }
-            if (dom.syncLiveStatus && result[STORAGE_KEYS.syncLiveStatus]) {
-                dom.syncLiveStatus.textContent = result[STORAGE_KEYS.syncLiveStatus];
             }
             resolve();
         });
