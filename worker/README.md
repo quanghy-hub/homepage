@@ -26,10 +26,10 @@ This lets `macbook` and `mobile` use different pinned groups and UI sizing
 while still sharing the same groups and links.
 
 Backup `b` is updated on every successful write. Backup `a` is copied from
-`b` once per day at the client-provided `backupAHour` in the client's time
-zone. The Worker cron runs hourly, so A can still be refreshed from B even if
-the browser is offline at that time. `PUT /sync/:appId/backup/a` forces an
-immediate A snapshot.
+`b` once per day at the fixed Worker time, 01:00 Asia/Ho_Chi_Minh. The Worker
+cron runs hourly, so A can still be refreshed from B even if the browser is
+offline at that time. `PUT /sync/:appId/backup/a` forces an immediate A
+snapshot.
 
 ## Deploy
 

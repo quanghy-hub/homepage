@@ -88,19 +88,11 @@ function asObject(value) {
 }
 
 function normalizeBackupAHour(value) {
-  const hour = Number(value);
-  if (!Number.isFinite(hour)) return DEFAULT_BACKUP_A_HOUR;
-  return Math.min(23, Math.max(0, Math.round(hour)));
+  return DEFAULT_BACKUP_A_HOUR;
 }
 
 function normalizeTimeZone(value) {
-  const timeZone = typeof value === 'string' && value ? value : DEFAULT_BACKUP_A_TIME_ZONE;
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
-    return timeZone;
-  } catch {
-    return DEFAULT_BACKUP_A_TIME_ZONE;
-  }
+  return DEFAULT_BACKUP_A_TIME_ZONE;
 }
 
 function getLocalDateParts(date, timeZone) {
@@ -270,8 +262,8 @@ async function writeState(bucket, appId, incoming) {
   const payload = asObject(incoming);
   const groups = asObject(payload.groups);
   const profileId = String(payload.profileId || '').toLowerCase();
-  const backupAHour = normalizeBackupAHour(payload.backupAHour ?? existing.backupAHour);
-  const backupATimeZone = normalizeTimeZone(payload.backupATimeZone || existing.backupATimeZone);
+  const backupAHour = DEFAULT_BACKUP_A_HOUR;
+  const backupATimeZone = DEFAULT_BACKUP_A_TIME_ZONE;
 
   if (profileId && !APP_ID_PATTERN.test(profileId)) {
     throw new Error('Invalid profileId');
@@ -341,7 +333,8 @@ async function runScheduledBackups(bucket, now = new Date()) {
   for (const appId of appIds) {
     const state = await readState(bucket, appId);
     if (state.revision > 0) {
-      await maybeRunScheduledBackupA(bucket, appId, state, now);
+      const backupB = await readBackup(bucket, appId, 'b');
+      await maybeRunScheduledBackupA(bucket, appId, backupB || state, now);
       results.push(appId);
     }
   }
