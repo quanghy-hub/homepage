@@ -547,14 +547,28 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     loadData(),
     loadFaviconCache(),
     syncController.loadSavedRevision(),
-    syncController.loadSavedReady()
-  ]).then(([, , savedRevision]) => {
+    syncController.loadSavedReady(),
+    syncController.loadSavedCredentials()
+  ]).then(([, , savedRevision, savedReady]) => {
     syncRevision = savedRevision;
-    syncController.loadSavedCredentials();
     render();
     requestAnimationFrame(() => {
       document.body.classList.remove('app-loading');
     });
+
+    if (savedReady) {
+      syncController.pull(false).catch(err => console.error('Auto pull failed:', err));
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      syncController.loadSavedReady().then(isReady => {
+        if (isReady) {
+          syncController.pull(false).catch(err => console.error('Auto pull on visible failed:', err));
+        }
+      });
+    }
   });
 
 })();

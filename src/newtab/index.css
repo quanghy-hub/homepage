@@ -803,6 +803,16 @@ body.edit-mode .pinned-group-header:active {
   margin: 0 !important;
   padding: 7px 8px;
   text-align: right;
+  border: none;
+  border-radius: 8px;
+  background: #0d1117;
+  color: #e6edf3;
+  font-size: 14px;
+  outline: none;
+}
+
+.sync-live-row input:focus {
+  box-shadow: 0 0 0 1px #388bfd;
 }
 
 .sync-live-status {

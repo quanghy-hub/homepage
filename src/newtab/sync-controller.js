@@ -72,6 +72,8 @@ export function createSyncController({
 
     const updated = await pushCloudflareState(dom, getState(), getRevision());
     applyRemoteState(updated);
+    syncReady = true;
+    saveSyncReady(true);
     saveData({ skipAutoSync: true });
     refreshSettingsControls();
 
@@ -106,7 +108,10 @@ export function createSyncController({
   function scheduleAutoSync() {
     clearTimeout(autoSyncTimer);
     const config = getSyncSettings(dom);
-    if (!config.workerUrl || !config.apiCode) return;
+    if (!config.workerUrl || !config.apiCode) {
+      setLiveStatus('B paused: missing sync config');
+      return;
+    }
     const delayMs = Math.max(1, config.delaySeconds || 5) * 1000;
     setLiveStatus(`B in ${config.delaySeconds || 5}s`);
 
@@ -128,6 +133,10 @@ export function createSyncController({
       onConfigChange: () => {
         syncReady = false;
         setLiveStatus('settings updated');
+      },
+      onDelayChange: (delaySeconds) => {
+        setLiveStatus(`delay updated to ${delaySeconds}s`);
+        scheduleAutoSync();
       }
     });
 
@@ -141,6 +150,8 @@ export function createSyncController({
           setRevision(remote.revision);
           saveSyncRevision(remote.revision);
         }
+        syncReady = true;
+        saveSyncReady(true);
         setVerifyStatus('✓ Connected to Worker successfully', 'ok');
       } catch (err) {
         setVerifyStatus('✗ Connection failed · ' + err.message, 'err');
@@ -203,6 +214,7 @@ export function createSyncController({
     },
     loadSavedRevision: loadSavedSyncRevision,
     scheduleAutoSync,
-    setVerifyStatus
+    setVerifyStatus,
+    pull: pullFromCloudflare
   };
 }

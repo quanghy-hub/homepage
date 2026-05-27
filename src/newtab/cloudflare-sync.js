@@ -68,6 +68,7 @@ function buildConfiguredSync(dom) {
 export function bindSyncCredentialInputs(dom, handlers = {}) {
     const onProfileChange = typeof handlers === 'function' ? handlers : handlers.onProfileChange;
     const onConfigChange = typeof handlers === 'object' ? handlers.onConfigChange : null;
+    const onDelayChange = typeof handlers === 'object' ? handlers.onDelayChange : null;
 
     function markSyncConfigChanged() {
         chrome.storage.local.set({ [STORAGE_KEYS.syncReady]: false });
@@ -95,7 +96,7 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
         const delaySeconds = normalizeDelaySeconds(dom.syncDelayInput?.value);
         if (dom.syncDelayInput) dom.syncDelayInput.value = String(delaySeconds);
         chrome.storage.local.set({ [STORAGE_KEYS.syncDelaySeconds]: delaySeconds });
-        if (onConfigChange) onConfigChange();
+        if (onDelayChange) onDelayChange(delaySeconds);
     };
     dom.syncDelayInput?.addEventListener('change', saveSyncDelay);
     dom.syncDelayInput?.addEventListener('blur', saveSyncDelay);
@@ -104,22 +105,25 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
 }
 
 export function loadSavedSyncCredentials(dom) {
-    chrome.storage.local.get([
-        STORAGE_KEYS.syncWorkerUrl,
-        STORAGE_KEYS.syncApiCode,
-        STORAGE_KEYS.syncProfile,
-        STORAGE_KEYS.syncDelaySeconds
-    ], result => {
-        dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
-        dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
-        dom.syncProfileSelect.value = PROFILE_IDS.includes(result[STORAGE_KEYS.syncProfile])
-            ? result[STORAGE_KEYS.syncProfile]
-            : DEFAULT_PROFILE_ID;
-        if (dom.syncModeSelect) dom.syncModeSelect.value = 'auto';
-        if (dom.syncDelayInput) {
-            const savedDelay = Number(result[STORAGE_KEYS.syncDelaySeconds]);
-            dom.syncDelayInput.value = String(normalizeDelaySeconds(savedDelay));
-        }
+    return new Promise(resolve => {
+        chrome.storage.local.get([
+            STORAGE_KEYS.syncWorkerUrl,
+            STORAGE_KEYS.syncApiCode,
+            STORAGE_KEYS.syncProfile,
+            STORAGE_KEYS.syncDelaySeconds
+        ], result => {
+            dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
+            dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
+            dom.syncProfileSelect.value = PROFILE_IDS.includes(result[STORAGE_KEYS.syncProfile])
+                ? result[STORAGE_KEYS.syncProfile]
+                : DEFAULT_PROFILE_ID;
+            if (dom.syncModeSelect) dom.syncModeSelect.value = 'auto';
+            if (dom.syncDelayInput) {
+                const savedDelay = Number(result[STORAGE_KEYS.syncDelaySeconds]);
+                dom.syncDelayInput.value = String(normalizeDelaySeconds(savedDelay));
+            }
+            resolve();
+        });
     });
 }
 
