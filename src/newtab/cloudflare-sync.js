@@ -60,19 +60,19 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
     const onConfigChange = typeof handlers === 'object' ? handlers.onConfigChange : null;
     const onModeChange = typeof handlers === 'object' ? handlers.onModeChange : null;
 
-    function markNeedsInitialPull() {
+    function markSyncConfigChanged() {
         chrome.storage.local.set({ [STORAGE_KEYS.syncReady]: false });
         if (onConfigChange) onConfigChange();
     }
 
     dom.syncWorkerUrlInput.addEventListener('input', () => {
         chrome.storage.local.set({ [STORAGE_KEYS.syncWorkerUrl]: dom.syncWorkerUrlInput.value.trim() });
-        markNeedsInitialPull();
+        markSyncConfigChanged();
     });
 
     dom.syncApiCodeInput.addEventListener('input', () => {
         chrome.storage.local.set({ [STORAGE_KEYS.syncApiCode]: dom.syncApiCodeInput.value.trim() });
-        markNeedsInitialPull();
+        markSyncConfigChanged();
     });
 
     dom.syncProfileSelect.addEventListener('change', () => {
@@ -179,14 +179,21 @@ export async function pullCloudflareState(dom) {
 
 export async function pushCloudflareState(dom, state, baseRevision = null) {
     const { endpoint, headers } = buildConfiguredSync(dom);
-    const res = await fetch(endpoint, {
+    const putState = async revision => fetch(endpoint, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(buildExportData(state, baseRevision))
+        body: JSON.stringify(buildExportData(state, revision))
     });
 
+    let res = await putState(baseRevision);
     if (res.status === 409) {
-        throw new Error('Cloud has newer data. Please Pull from Cloud first to check and avoid conflicts.');
+        const latest = await fetch(endpoint, {
+            method: 'GET',
+            headers
+        });
+        if (!latest.ok) throw new Error(`HTTP ${latest.status}: ${latest.statusText}`);
+        const latestState = await latest.json();
+        res = await putState(latestState.revision);
     }
 
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);

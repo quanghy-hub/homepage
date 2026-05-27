@@ -63,10 +63,6 @@ export function createSyncController({
   }
 
   async function pushToCloudflare(showStatus = true) {
-    if (!syncReady) {
-      throw new Error('This device has not pulled from the cloud yet. Please Pull from Cloud first to avoid overwriting remote data.');
-    }
-
     persistCurrentProfile();
     if (showStatus) setSyncStatus('Pushing to cloud...');
 
@@ -85,10 +81,6 @@ export function createSyncController({
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) return;
     if (config.syncMode !== 'auto') return;
-    if (!syncReady || !Number.isSafeInteger(getRevision())) {
-      setSyncStatus('Auto sync is waiting for your initial Pull from Cloud.', '');
-      return;
-    }
 
     autoSyncTimer = setTimeout(async () => {
       try {
@@ -105,11 +97,11 @@ export function createSyncController({
       onProfileChange: switchProfile,
       onConfigChange: () => {
         syncReady = false;
-        setSyncStatus('Sync configuration updated. Please Pull from Cloud once before auto-sync.', '');
+        setSyncStatus('Sync configuration updated.', '');
       },
       onModeChange: syncMode => {
-        if (syncMode === 'auto' && !syncReady) {
-          setSyncStatus('Auto sync will be enabled after a successful initial Pull.', '');
+        if (syncMode === 'auto') {
+          setSyncStatus('Auto sync enabled.', 'ok');
         } else if (syncMode === 'manual') {
           setSyncStatus('Manual mode enabled: Use Push / Pull to sync.', '');
         }
