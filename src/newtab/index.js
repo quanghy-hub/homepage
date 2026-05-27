@@ -295,7 +295,6 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
 
   function deleteGroup(groupName) {
     if (!groupName || groups.list.length <= 2) return;
-    if (!confirm(`Delete group "${groupName}"? All links in this group will also be deleted.`)) return;
 
     groups.list = groups.list.filter(x => x !== groupName);
     groups.pinned = groups.pinned.filter(x => x !== groupName);
@@ -307,7 +306,7 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
 
     groups.selected = selectedGroup;
     removeGroupFromProfiles(groupName);
-    saveData({ skipAutoSync: true });
+    saveData();
     render();
   }
 
@@ -319,7 +318,7 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     links = links.filter(l => l._id !== linkId);
     const sameGroup = getLinksForGroup(target.parent);
     sameGroup.forEach((item, idx) => { item.order = idx; });
-    saveData({ skipAutoSync: true });
+    saveData();
     render();
   }
 
@@ -549,26 +548,13 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     syncController.loadSavedRevision(),
     syncController.loadSavedReady(),
     syncController.loadSavedCredentials()
-  ]).then(([, , savedRevision, savedReady]) => {
+  ]).then(([, , savedRevision]) => {
     syncRevision = savedRevision;
     render();
     requestAnimationFrame(() => {
       document.body.classList.remove('app-loading');
     });
-
-    if (savedReady) {
-      syncController.pull(false).catch(err => console.error('Auto pull failed:', err));
-    }
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      syncController.loadSavedReady().then(isReady => {
-        if (isReady) {
-          syncController.pull(false).catch(err => console.error('Auto pull on visible failed:', err));
-        }
-      });
-    }
+    syncController.refreshStatus();
   });
 
 })();

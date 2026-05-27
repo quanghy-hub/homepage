@@ -127,6 +127,15 @@ export function createSyncController({
     }, delayMs);
   }
 
+  function refreshStatus() {
+    const config = getSyncSettings(dom);
+    if (!config.workerUrl || !config.apiCode) {
+      setLiveStatus('B paused: missing sync config');
+      return;
+    }
+    setLiveStatus(`B ready · ${config.delaySeconds || 5}s`);
+  }
+
   function bind() {
     bindSyncCredentialInputs(dom, {
       onProfileChange: switchProfile,
@@ -214,6 +223,7 @@ export function createSyncController({
     },
     loadSavedRevision: loadSavedSyncRevision,
     scheduleAutoSync,
+    refreshStatus,
     setVerifyStatus,
     pull: pullFromCloudflare
   };
