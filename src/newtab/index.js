@@ -539,6 +539,7 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     exitEditMode,
     isEditMode: () => isEditMode,
     isTouchDevice: IS_TOUCH_DEVICE,
+    openGroupEditor,
   });
   setEditMode(false);
   Promise.all([

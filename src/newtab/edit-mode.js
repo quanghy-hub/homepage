@@ -1,4 +1,4 @@
-export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode, isTouchDevice }) {
+export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode, isTouchDevice, openGroupEditor }) {
     let longPressTimer = null;
     let longPressStartX = 0;
     let longPressStartY = 0;
@@ -20,6 +20,9 @@ export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode
 
         longPressConsumed = true;
         if (isEditMode()) {
+            if (groupEl && typeof openGroupEditor === 'function') {
+                openGroupEditor(groupEl.dataset.groupName);
+            }
             return; // Disable exiting via long press
         } else {
             enterEditMode();
@@ -27,8 +30,8 @@ export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode
     }
 
     function startLongPress(target, clientX, clientY, delay) {
-        if (isEditMode()) return; // Disable long press detection in edit mode
         if (!canStartLongPress(target)) return;
+        if (isEditMode() && !target.closest('.group-context-target')) return;
         longPressStartX = clientX;
         longPressStartY = clientY;
         longPressTarget = target;
@@ -96,6 +99,7 @@ export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode
             lastTouchTime = now;
             lastTouchX = touch.clientX;
             lastTouchY = touch.clientY;
+            startLongPress(e.target, touch.clientX, touch.clientY, isTouchDevice ? 380 : 480);
             return;
         }
 
