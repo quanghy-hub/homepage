@@ -100,7 +100,10 @@ export function createSyncController({
     }
 
     if (showStatus) {
-      setSyncStatus(`✓ B synced · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
+      const label = updated?.syncMerged
+        ? 'B synced with newer cloud data'
+        : updated?.syncConflict ? 'B had newer update; restored' : 'B synced';
+      setSyncStatus(`✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
     }
     return updated;
   }
@@ -150,7 +153,10 @@ export function createSyncController({
       autoSyncTimer = null;
       try {
         const updated = await pushToCloudflare(false);
-        setSyncStatus(`✓ B synced · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
+        const label = updated?.syncMerged
+          ? 'B synced with newer cloud data'
+          : updated?.syncConflict ? 'B had newer update; restored' : 'B synced';
+        setSyncStatus(`✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
       } catch (err) {
         setSyncStatus('✗ Auto sync error: ' + err.message, 'err');
       }
@@ -183,8 +189,9 @@ export function createSyncController({
     }
   }
 
-  async function bootstrapCloud() {
-    if (syncReady || isBootstrapping) return syncReady;
+  async function bootstrapCloud(options = {}) {
+    const force = options?.force === true;
+    if ((!force && syncReady) || isBootstrapping) return syncReady;
 
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) {
@@ -261,7 +268,7 @@ export function createSyncController({
         dom.verifySyncBtn.disabled = true;
         setVerifyStatus('Testing connection...');
 
-        await bootstrapCloud();
+        await bootstrapCloud({ force: true });
         const remote = await verifyCloudflareSync(dom);
         setVerifyStatus(`✓ Connected to Worker successfully · ${revisionText(remote.revision || 0)} · ${formatSyncStamp()}`, 'ok');
         startAutoRestore();

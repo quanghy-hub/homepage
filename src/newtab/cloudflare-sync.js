@@ -200,6 +200,48 @@ export function buildExportData(state, baseRevision = null, options = {}) {
     };
 }
 
+function mergeLocalAddsIntoRemote(remote, localState) {
+    const remoteLinks = Array.isArray(remote?.links) ? remote.links : [];
+    const localLinks = Array.isArray(localState?.links) ? localState.links : [];
+    const mergedLinks = remoteLinks.slice();
+    const remoteLinkIds = new Set(remoteLinks.map(link => link?._id).filter(Boolean));
+
+    localLinks.forEach(link => {
+        if (link?._id && !remoteLinkIds.has(link._id)) {
+            mergedLinks.push(link);
+            remoteLinkIds.add(link._id);
+        }
+    });
+
+    const remoteGroups = Array.isArray(remote?.groups?.list) ? remote.groups.list : [];
+    const localGroups = Array.isArray(localState?.groups?.list) ? localState.groups.list : [];
+    const mergedGroups = remoteGroups.slice();
+    const groupNames = new Set(mergedGroups);
+
+    localGroups.forEach(groupName => {
+        if (typeof groupName === 'string' && !groupNames.has(groupName)) {
+            mergedGroups.push(groupName);
+            groupNames.add(groupName);
+        }
+    });
+
+    mergedLinks.forEach(link => {
+        if (typeof link?.parent === 'string' && !groupNames.has(link.parent)) {
+            mergedGroups.push(link.parent);
+            groupNames.add(link.parent);
+        }
+    });
+
+    return {
+        ...localState,
+        links: mergedLinks,
+        groups: {
+            ...(localState?.groups || {}),
+            list: mergedGroups
+        }
+    };
+}
+
 export async function verifyCloudflareSync(dom) {
     const { endpoint, headers } = buildConfiguredSync(dom);
     const res = await fetch(endpoint, {
@@ -266,10 +308,10 @@ export async function pushCloudflareBackup(dom, slot) {
 
 export async function pushCloudflareState(dom, state, baseRevision = null) {
     const { endpoint, headers } = buildConfiguredSync(dom);
-    const putState = async revision => fetch(endpoint, {
+    const putState = async (revision, nextState = state) => fetch(endpoint, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(buildExportData(state, revision))
+        body: JSON.stringify(buildExportData(nextState, revision))
     });
 
     let res = await putState(baseRevision);
@@ -280,7 +322,18 @@ export async function pushCloudflareState(dom, state, baseRevision = null) {
         });
         if (!latest.ok) throw new Error(`HTTP ${latest.status}: ${latest.statusText}`);
         const latestState = await latest.json();
-        res = await putState(latestState.revision);
+        res = await putState(latestState.revision, mergeLocalAddsIntoRemote(latestState, state));
+        if (res.status === 409) {
+            return {
+                ...latestState,
+                syncConflict: true
+            };
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        return {
+            ...await res.json(),
+            syncMerged: true
+        };
     }
 
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);

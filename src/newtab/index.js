@@ -556,7 +556,7 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
       document.body.classList.remove('app-loading');
     });
     syncController.refreshStatus();
-    syncController.bootstrapCloud();
+    syncController.bootstrapCloud({ force: true });
     syncController.startAutoRestore();
   });
 
