@@ -48,35 +48,39 @@ export function createHomeRenderer({
     if (faviconPending.has(hostname)) return;
 
     const pending = new Promise(resolve => {
-      chrome.runtime.sendMessage({ type: 'fetch-favicon', url: faviconUrl }, async response => {
-        if (chrome.runtime.lastError || !response?.ok || !response.dataUrl) {
-          resolve();
-          return;
-        }
-
-        const dataUrl = response.dataUrl;
-        getFaviconCache()[hostname] = {
-          dataUrl,
-          updatedAt: Date.now()
-        };
-        persistFaviconCache();
-        const relatedImgs = document.querySelectorAll(`img[data-hostname="${hostname}"]`);
-        relatedImgs.forEach(node => {
-          if (!node.isConnected) return;
-          node.src = dataUrl;
-          const item = node.closest('.link-item');
-          const wrap = node.closest('.icon-wrap');
-          item?.classList.remove('fallback-ready');
-          if (wrap) {
-            wrap.textContent = '';
-            wrap.appendChild(node);
+      try {
+        chrome.runtime.sendMessage({ type: 'fetch-favicon', url: faviconUrl }, response => {
+          if (chrome.runtime.lastError || !response?.ok || !response.dataUrl) {
+            resolve();
+            return;
           }
+
+          const dataUrl = response.dataUrl;
+          getFaviconCache()[hostname] = {
+            dataUrl,
+            updatedAt: Date.now()
+          };
+          persistFaviconCache();
+          const relatedImgs = document.querySelectorAll(`img[data-hostname="${hostname}"]`);
+          relatedImgs.forEach(node => {
+            if (!node.isConnected) return;
+            node.src = dataUrl;
+            const item = node.closest('.link-item');
+            const wrap = node.closest('.icon-wrap');
+            item?.classList.remove('fallback-ready');
+            if (wrap) {
+              wrap.textContent = '';
+              wrap.appendChild(node);
+            }
+          });
+          if (img?.isConnected && !relatedImgs.length) {
+            img.src = dataUrl;
+          }
+          resolve();
         });
-        if (img?.isConnected && !relatedImgs.length) {
-          img.src = dataUrl;
-        }
+      } catch (_) {
         resolve();
-      });
+      }
     }).finally(() => {
       faviconPending.delete(hostname);
     });

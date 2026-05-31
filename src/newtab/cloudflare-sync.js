@@ -313,15 +313,28 @@ export async function pushCloudflareState(dom, state, baseRevision = null) {
         headers,
         body: JSON.stringify(buildExportData(nextState, revision))
     });
-
-    let res = await putState(baseRevision);
-    if (res.status === 409) {
+    const fetchLatestState = async () => {
         const latest = await fetch(endpoint, {
             method: 'GET',
             headers
         });
         if (!latest.ok) throw new Error(`HTTP ${latest.status}: ${latest.statusText}`);
-        const latestState = await latest.json();
+        return latest.json();
+    };
+
+    if (!Number.isSafeInteger(baseRevision)) {
+        const latestState = await fetchLatestState();
+        const res = await putState(latestState.revision, mergeLocalAddsIntoRemote(latestState, state));
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        return {
+            ...await res.json(),
+            syncMerged: true
+        };
+    }
+
+    let res = await putState(baseRevision);
+    if (res.status === 409) {
+        const latestState = await fetchLatestState();
         res = await putState(latestState.revision, mergeLocalAddsIntoRemote(latestState, state));
         if (res.status === 409) {
             return {
