@@ -8,11 +8,23 @@ export function getHostname(url) {
 }
 
 export function getFavicon(url) {
+    return getFaviconCandidates(url)[0] || '';
+}
+
+export function getFaviconCandidates(url) {
     try {
         const parsed = new URL(url);
-        return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(parsed.href)}&sz=128`;
+        const candidates = [];
+
+        if (parsed.hostname === 'mail.google.com') {
+            candidates.push('https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico');
+        }
+
+        candidates.push(`https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(parsed.href)}&sz=128`);
+        candidates.push(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsed.hostname)}&sz=128`);
+        return candidates;
     } catch {
-        return '';
+        return [];
     }
 }
 

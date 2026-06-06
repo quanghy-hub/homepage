@@ -9,11 +9,12 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   background: #0d1117;
   color: #e6edf3;
   overflow-x: hidden;
+  overflow-y: auto;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -29,8 +30,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+  justify-content: flex-start;
+  min-height: 100dvh;
+  padding: 24px 0;
 }
 
 body.edit-mode {
@@ -54,6 +56,7 @@ body:not(.app-loading) #loading-shell {
   max-width: var(--page-width, 1400px);
   display: flex;
   flex-direction: column;
+  margin: auto 0;
   padding: 0 16px;
 }
 
@@ -63,6 +66,7 @@ body:not(.app-loading) #loading-shell {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  margin: auto 0;
   padding: 0 16px;
 }
 

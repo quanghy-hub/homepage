@@ -1,4 +1,4 @@
-import { autoTitle, getFavicon, getFaviconCacheKey, getHostname } from '../shared/utils/link-utils.js';
+import { autoTitle, getFaviconCacheKey, getFaviconCandidates, getHostname } from '../shared/utils/link-utils.js';
 
 export const FAVICON_CACHE_TTL = 1000 * 60 * 60 * 24 * 14;
 
@@ -41,15 +41,15 @@ export function createHomeRenderer({
     return Date.now() - (entry.updatedAt || 0) > FAVICON_CACHE_TTL;
   }
 
-  async function ensureFaviconCached(url, img) {
+  async function ensureFaviconCached(url, img, options = {}) {
     const faviconKey = getFaviconCacheKey(url);
-    const faviconUrl = getFavicon(url);
-    if (!faviconKey || !faviconUrl) return;
-    if (faviconPending.has(faviconKey)) return;
+    const faviconUrls = getFaviconCandidates(url);
+    if (!faviconKey || !faviconUrls.length) return;
+    if (!options.force && faviconPending.has(faviconKey)) return;
 
     const pending = new Promise(resolve => {
       try {
-        chrome.runtime.sendMessage({ type: 'fetch-favicon', url: faviconUrl }, response => {
+        chrome.runtime.sendMessage({ type: 'fetch-favicon', urls: faviconUrls }, response => {
           if (chrome.runtime.lastError || !response?.ok || !response.dataUrl) {
             resolve();
             return;
@@ -58,6 +58,7 @@ export function createHomeRenderer({
           const dataUrl = response.dataUrl;
           getFaviconCache()[faviconKey] = {
             dataUrl,
+            sourceUrl: response.sourceUrl || '',
             updatedAt: Date.now()
           };
           persistFaviconCache();
@@ -113,6 +114,13 @@ export function createHomeRenderer({
       img.style.display = 'none';
       iconWrap.textContent = (link.title || '?')[0].toUpperCase();
       el.classList.add('fallback-ready');
+    };
+    img.onload = () => {
+      if (img.dataset.refreshedLowRes || !img.naturalWidth || !img.naturalHeight) return;
+      if (Math.min(img.naturalWidth, img.naturalHeight) >= 48) return;
+
+      img.dataset.refreshedLowRes = '1';
+      ensureFaviconCached(link.url, img, { force: true });
     };
     if (cachedFavicon) {
       img.src = cachedFavicon;

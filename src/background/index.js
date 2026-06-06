@@ -59,15 +59,27 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== 'fetch-favicon' || !message.url) return;
+  if (message?.type !== 'fetch-favicon' || (!message.url && !Array.isArray(message.urls))) return;
 
   (async () => {
     try {
-      const res = await fetch(message.url, { cache: 'force-cache' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const dataUrl = await blobToDataUrl(blob);
-      sendResponse({ ok: true, dataUrl });
+      const urls = Array.isArray(message.urls) ? message.urls : [message.url];
+      let lastError = null;
+
+      for (const url of urls.filter(Boolean)) {
+        try {
+          const res = await fetch(url, { cache: 'force-cache' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          const dataUrl = await blobToDataUrl(blob);
+          sendResponse({ ok: true, dataUrl, sourceUrl: url });
+          return;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      throw lastError || new Error('No favicon candidates');
     } catch (err) {
       sendResponse({ ok: false, error: err.message });
     }
