@@ -1,4 +1,4 @@
-import { autoTitle, getFavicon, getHostname } from '../shared/utils/link-utils.js';
+import { autoTitle, getFavicon, getFaviconCacheKey, getHostname } from '../shared/utils/link-utils.js';
 
 export const FAVICON_CACHE_TTL = 1000 * 60 * 60 * 24 * 14;
 
@@ -24,28 +24,28 @@ export function createHomeRenderer({
   }
 
   function getCachedFavicon(url) {
-    const hostname = getHostname(url);
-    if (!hostname) return '';
+    const faviconKey = getFaviconCacheKey(url);
+    if (!faviconKey) return '';
 
-    const entry = getFaviconCache()[hostname];
+    const entry = getFaviconCache()[faviconKey];
     if (!entry?.dataUrl) return '';
 
     return entry.dataUrl;
   }
 
   function isFaviconExpired(url) {
-    const hostname = getHostname(url);
-    if (!hostname) return true;
-    const entry = getFaviconCache()[hostname];
+    const faviconKey = getFaviconCacheKey(url);
+    if (!faviconKey) return true;
+    const entry = getFaviconCache()[faviconKey];
     if (!entry?.dataUrl) return true;
     return Date.now() - (entry.updatedAt || 0) > FAVICON_CACHE_TTL;
   }
 
   async function ensureFaviconCached(url, img) {
-    const hostname = getHostname(url);
+    const faviconKey = getFaviconCacheKey(url);
     const faviconUrl = getFavicon(url);
-    if (!hostname || !faviconUrl) return;
-    if (faviconPending.has(hostname)) return;
+    if (!faviconKey || !faviconUrl) return;
+    if (faviconPending.has(faviconKey)) return;
 
     const pending = new Promise(resolve => {
       try {
@@ -56,12 +56,12 @@ export function createHomeRenderer({
           }
 
           const dataUrl = response.dataUrl;
-          getFaviconCache()[hostname] = {
+          getFaviconCache()[faviconKey] = {
             dataUrl,
             updatedAt: Date.now()
           };
           persistFaviconCache();
-          const relatedImgs = document.querySelectorAll(`img[data-hostname="${hostname}"]`);
+          const relatedImgs = document.querySelectorAll(`img[data-favicon-key="${faviconKey}"]`);
           relatedImgs.forEach(node => {
             if (!node.isConnected) return;
             node.src = dataUrl;
@@ -82,10 +82,10 @@ export function createHomeRenderer({
         resolve();
       }
     }).finally(() => {
-      faviconPending.delete(hostname);
+      faviconPending.delete(faviconKey);
     });
 
-    faviconPending.set(hostname, pending);
+    faviconPending.set(faviconKey, pending);
   }
 
   function createLinkEl(link) {
@@ -102,8 +102,10 @@ export function createHomeRenderer({
 
     const img = document.createElement('img');
     const hostname = getHostname(link.url);
+    const faviconKey = getFaviconCacheKey(link.url);
     const cachedFavicon = getCachedFavicon(link.url);
     img.dataset.hostname = hostname;
+    img.dataset.faviconKey = faviconKey;
     img.alt = '';
     img.loading = 'eager';
     img.decoding = 'async';

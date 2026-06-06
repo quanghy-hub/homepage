@@ -392,6 +392,12 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
 
     document.addEventListener('contextmenu', e => {
       if (!isEditMode) return;
+      const draggableTarget = e.target.closest('.link-item, .pinned-group-header, #group-tabs .tab:not(.tab-add-group)');
+      if (draggableTarget && IS_TOUCH_DEVICE) {
+        e.preventDefault();
+        return;
+      }
+
       const groupTarget = e.target.closest('.group-context-target');
       if (!groupTarget) return;
       e.preventDefault();

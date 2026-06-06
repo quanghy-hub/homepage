@@ -8,8 +8,24 @@ export function getHostname(url) {
 }
 
 export function getFavicon(url) {
-    const hostname = getHostname(url);
-    return hostname ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=128` : '';
+    try {
+        const parsed = new URL(url);
+        return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(parsed.href)}&sz=128`;
+    } catch {
+        return '';
+    }
+}
+
+export function getFaviconCacheKey(url) {
+    try {
+        const parsed = new URL(url);
+        const firstPathSegment = parsed.pathname.split('/').filter(Boolean)[0] || '';
+        return firstPathSegment
+            ? `${parsed.origin}/${firstPathSegment}`
+            : parsed.origin;
+    } catch {
+        return '';
+    }
 }
 
 export function autoTitle(url) {

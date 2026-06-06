@@ -216,6 +216,15 @@ body:not(.edit-mode) .link-item {
   cursor: pointer;
 }
 
+body.edit-mode .link-item,
+body.edit-mode #group-tabs .tab:not(.tab-add-group),
+body.edit-mode .pinned-group-header {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
 .link-item:active {
   cursor: grabbing;
 }
