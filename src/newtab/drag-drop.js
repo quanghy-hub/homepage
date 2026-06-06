@@ -9,6 +9,180 @@ export function bindDragDrop({
   reorderPinnedGroup,
   saveData
 }) {
+  let touchDrag = null;
+
+  function clearDragOver() {
+    document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+  }
+
+  function getTouchDropTarget(touch) {
+    if (!touch) return null;
+    return document.elementFromPoint(touch.clientX, touch.clientY);
+  }
+
+  function getTouchDragCandidate(target) {
+    const header = target.closest('.pinned-group-header');
+    if (header) {
+      return {
+        el: header,
+        id: header.dataset.groupName,
+        startClass: 'dragging-group-header',
+        type: 'pinned-group'
+      };
+    }
+
+    const tab = target.closest('#group-tabs .tab');
+    if (tab && !tab.classList.contains('tab-add-group')) {
+      return {
+        el: tab,
+        id: tab.dataset.groupName,
+        startClass: 'dragging-group',
+        type: 'group'
+      };
+    }
+
+    const item = target.closest('.link-item');
+    if (!item) return null;
+
+    return {
+      el: item,
+      id: item.dataset.id,
+      parent: item.dataset.parent,
+      startClass: 'dragging',
+      type: 'link'
+    };
+  }
+
+  function markTouchDragOver(target) {
+    clearDragOver();
+    if (!touchDrag || !target) return;
+
+    if (touchDrag.type === 'pinned-group') {
+      const header = target.closest('.pinned-group-header');
+      if (header && header.dataset.groupName !== touchDrag.id) {
+        header.classList.add('drag-over');
+      }
+      return;
+    }
+
+    if (touchDrag.type === 'group') {
+      const tab = target.closest('#group-tabs .tab');
+      if (tab && !tab.classList.contains('tab-add-group') && tab.dataset.groupName !== touchDrag.id) {
+        tab.classList.add('drag-over');
+      }
+      return;
+    }
+
+    const item = target.closest('.link-item');
+    if (item && item.dataset.id !== touchDrag.id) {
+      item.classList.add('drag-over');
+    }
+  }
+
+  function finishTouchDrag(target) {
+    if (!touchDrag || !touchDrag.active || !target) return;
+
+    if (touchDrag.type === 'pinned-group') {
+      const header = target.closest('.pinned-group-header');
+      if (header && header.dataset.groupName !== touchDrag.id) {
+        reorderPinnedGroup(touchDrag.id, header.dataset.groupName);
+      }
+      return;
+    }
+
+    if (touchDrag.type === 'group') {
+      const tab = target.closest('#group-tabs .tab');
+      if (tab && !tab.classList.contains('tab-add-group') && tab.dataset.groupName !== touchDrag.id) {
+        reorderGroup(touchDrag.id, tab.dataset.groupName);
+      }
+      return;
+    }
+
+    const item = target.closest('.link-item');
+    if (item) {
+      if (item.dataset.id !== touchDrag.id) {
+        reorderLink(touchDrag.id, item.dataset.id, item.dataset.parent);
+      }
+      return;
+    }
+
+    const grid = target.closest('.links-grid[data-group]');
+    if (!grid) return;
+
+    const dragged = getLinks().find(link => link._id === touchDrag.id);
+    if (!dragged) return;
+
+    const sourceGroup = dragged.parent;
+    const targetGroup = grid.dataset.group;
+    const targetLinks = getLinksForGroup(targetGroup).filter(link => link._id !== touchDrag.id);
+    dragged.parent = targetGroup;
+    dragged.order = targetLinks.length;
+    normalizeGroupOrders(sourceGroup, targetGroup);
+    saveData();
+    render();
+  }
+
+  document.addEventListener('touchstart', e => {
+    if (!isEditMode() || e.touches.length !== 1) return;
+
+    const candidate = getTouchDragCandidate(e.target);
+    if (!candidate) return;
+
+    const touch = e.touches[0];
+    touchDrag = {
+      ...candidate,
+      active: false,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      lastX: touch.clientX,
+      lastY: touch.clientY
+    };
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!touchDrag || e.touches.length !== 1) return;
+
+    const touch = e.touches[0];
+    touchDrag.lastX = touch.clientX;
+    touchDrag.lastY = touch.clientY;
+
+    const dx = Math.abs(touch.clientX - touchDrag.startX);
+    const dy = Math.abs(touch.clientY - touchDrag.startY);
+    if (!touchDrag.active && dx < 8 && dy < 8) return;
+
+    if (!touchDrag.active) {
+      touchDrag.active = true;
+      touchDrag.el.classList.add(touchDrag.startClass);
+    }
+
+    e.preventDefault();
+    markTouchDragOver(getTouchDropTarget(touch));
+  }, { passive: false });
+
+  document.addEventListener('touchend', e => {
+    if (!touchDrag) return;
+
+    const dropTouch = e.changedTouches[0] || { clientX: touchDrag.lastX, clientY: touchDrag.lastY };
+    const dropTarget = getTouchDropTarget(dropTouch);
+    const wasActive = touchDrag.active;
+
+    if (wasActive) {
+      e.preventDefault();
+      finishTouchDrag(dropTarget);
+    }
+
+    touchDrag.el.classList.remove(touchDrag.startClass);
+    clearDragOver();
+    touchDrag = null;
+  }, { passive: false });
+
+  document.addEventListener('touchcancel', () => {
+    if (!touchDrag) return;
+    touchDrag.el.classList.remove(touchDrag.startClass);
+    clearDragOver();
+    touchDrag = null;
+  }, { passive: true });
+
   document.addEventListener('dragstart', e => {
     if (!isEditMode()) {
       e.preventDefault();
@@ -53,7 +227,7 @@ export function bindDragDrop({
     }
     const item = e.target.closest('.link-item');
     item?.classList.remove('dragging');
-    document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+    clearDragOver();
   });
 
   document.addEventListener('dragover', e => {
@@ -66,7 +240,7 @@ export function bindDragDrop({
       if (draggingPinned) {
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-        document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+        clearDragOver();
         if (draggingPinned.dataset.groupName !== header.dataset.groupName) {
           header.classList.add('drag-over');
         }
@@ -81,7 +255,7 @@ export function bindDragDrop({
       if (draggingGroup) {
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-        document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+        clearDragOver();
         if (draggingGroup.dataset.groupName !== tab.dataset.groupName) {
           tab.classList.add('drag-over');
         }
@@ -100,7 +274,7 @@ export function bindDragDrop({
 
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-    document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+    clearDragOver();
     if (item) {
       const dragging = document.querySelector('.link-item.dragging');
       if (dragging && dragging.dataset.id !== item.dataset.id) {
@@ -133,7 +307,7 @@ export function bindDragDrop({
       const draggedPinnedName = e.dataTransfer.getData('text/pinned-group-name');
       if (draggedPinnedName && draggedPinnedName !== header.dataset.groupName) {
         e.preventDefault();
-        document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+        clearDragOver();
         reorderPinnedGroup(draggedPinnedName, header.dataset.groupName);
         return;
       }
@@ -145,7 +319,7 @@ export function bindDragDrop({
       const draggedGroupName = e.dataTransfer.getData('text/group-name');
       if (draggedGroupName && draggedGroupName !== tab.dataset.groupName) {
         e.preventDefault();
-        document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+        clearDragOver();
         reorderGroup(draggedGroupName, tab.dataset.groupName);
         return;
       }
@@ -161,7 +335,7 @@ export function bindDragDrop({
     if (draggedGroupName || draggedPinnedName) return;
 
     e.preventDefault();
-    document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+    clearDragOver();
     const draggedId = e.dataTransfer.getData('text/plain');
     if (!draggedId) return;
 
