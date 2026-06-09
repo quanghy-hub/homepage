@@ -367,6 +367,13 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
         return;
       }
 
+      const groupTarget = e.target.closest('.group-context-target');
+      if (groupTarget && isEditMode) {
+        e.preventDefault();
+        openGroupEditor(groupTarget.dataset.groupName || selectedGroup);
+        return;
+      }
+
       const tab = e.target.closest('#group-tabs .tab');
       if (tab) {
         if (tab.dataset.action === 'add-group') {
@@ -379,13 +386,6 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
         groups.selected = selectedGroup;
         saveData();
         render();
-        return;
-      }
-
-      const groupTarget = e.target.closest('.group-context-target');
-      if (groupTarget && isEditMode) {
-        e.preventDefault();
-        openGroupEditor(groupTarget.dataset.groupName || selectedGroup);
         return;
       }
     });
@@ -545,7 +545,6 @@ import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from 
     exitEditMode,
     isEditMode: () => isEditMode,
     isTouchDevice: IS_TOUCH_DEVICE,
-    openGroupEditor,
   });
   setEditMode(false);
   Promise.all([
