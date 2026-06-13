@@ -5,16 +5,19 @@ import {
   loadSavedSyncCredentials,
   loadSavedSyncRevision,
   loadSavedSyncStatuses,
+  saveSyncReady,
+  saveSyncRevision,
+  setSyncStatus as updateSyncStatus,
+  setVerifyStatus as updateVerifyStatus
+} from './cloudflare-sync.js';
+
+import {
   pullCloudflareBackup,
   pullCloudflareState,
   pushCloudflareBackup,
-  saveSyncReady,
   pushCloudflareState,
-  saveSyncRevision,
-  setSyncStatus as updateSyncStatus,
-  setVerifyStatus as updateVerifyStatus,
   verifyCloudflareSync
-} from './cloudflare-sync.js';
+} from './sync-api.js';
 
 export function createSyncController({
   applyImportedState,
@@ -69,7 +72,8 @@ export function createSyncController({
   async function pullFromCloudflare(showStatus = true) {
     if (showStatus) setSyncStatus('Pulling from cloud...');
 
-    const imported = await pullCloudflareState(dom);
+    const config = getSyncSettings(dom);
+    const imported = await pullCloudflareState(config.workerUrl, config.apiCode);
     applyRemoteState(imported);
     syncReady = true;
     saveSyncReady(true);
@@ -89,7 +93,8 @@ export function createSyncController({
     isPushing = true;
     let updated;
     try {
-      updated = await pushCloudflareState(dom, getState(), getRevision());
+      const config = getSyncSettings(dom);
+      updated = await pushCloudflareState(config.workerUrl, config.apiCode, getState(), getRevision());
       applyRemoteState(updated);
       syncReady = true;
       saveSyncReady(true);
@@ -110,7 +115,8 @@ export function createSyncController({
 
   async function pushBackupA() {
     setSyncStatus('Syncing A...');
-    const backup = await pushCloudflareBackup(dom, 'a');
+    const config = getSyncSettings(dom);
+    const backup = await pushCloudflareBackup(config.workerUrl, config.apiCode, 'a');
     setSyncStatus(`✓ A synced · ${revisionText(backup?.revision)} · ${formatSyncStamp()}`, 'ok');
     return backup;
   }
@@ -119,13 +125,14 @@ export function createSyncController({
     const label = slot === 'a' ? 'A' : 'B';
     setSyncStatus(`Restoring backup ${label}...`);
 
-    const imported = await pullCloudflareBackup(dom, slot);
+    const config = getSyncSettings(dom);
+    const imported = await pullCloudflareBackup(config.workerUrl, config.apiCode, slot);
     applyRemoteState(imported);
     saveData({ skipAutoSync: true });
     render();
     refreshSettingsControls();
 
-    const updated = await pushCloudflareState(dom, getState(), getRevision());
+    const updated = await pushCloudflareState(config.workerUrl, config.apiCode, getState(), getRevision());
     applyRemoteState(updated);
     saveData({ skipAutoSync: true });
     setSyncStatus(`✓ Restored backup ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
@@ -168,7 +175,8 @@ export function createSyncController({
 
     isRestoring = true;
     try {
-      const remote = await pullCloudflareState(dom);
+      const config = getSyncSettings(dom);
+      const remote = await pullCloudflareState(config.workerUrl, config.apiCode);
       const remoteRevision = Number.isSafeInteger(remote?.revision) ? remote.revision : 0;
       const localRevision = Number.isSafeInteger(getRevision()) ? getRevision() : 0;
 
@@ -200,7 +208,7 @@ export function createSyncController({
 
     isBootstrapping = true;
     try {
-      const remote = await pullCloudflareState(dom);
+      const remote = await pullCloudflareState(config.workerUrl, config.apiCode);
       const remoteRevision = Number.isSafeInteger(remote?.revision) ? remote.revision : 0;
       const localRevision = Number.isSafeInteger(getRevision()) ? getRevision() : 0;
 
@@ -269,7 +277,8 @@ export function createSyncController({
         setVerifyStatus('Testing connection...');
 
         await bootstrapCloud({ force: true });
-        const remote = await verifyCloudflareSync(dom);
+        const config = getSyncSettings(dom);
+        const remote = await verifyCloudflareSync(config.workerUrl, config.apiCode);
         setVerifyStatus(`✓ Connected to Worker successfully · ${revisionText(remote.revision || 0)} · ${formatSyncStamp()}`, 'ok');
         startAutoRestore();
       } catch (err) {
