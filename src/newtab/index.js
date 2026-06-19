@@ -1,10 +1,10 @@
 import { DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
-import { autoTitle } from '../shared/utils/link-utils.js';
+import { autoTitle, isHttpUrl } from '../shared/utils/link-utils.js';
 import { getDomRefs } from './dom.js';
 import { bindDragDrop } from './drag-drop.js';
 import { bindEditModeActivation } from './edit-mode.js';
-import { createHomeRenderer, FAVICON_CACHE_TTL } from './home-renderer.js';
+import { createHomeRenderer } from './home-renderer.js';
 import { createModalController } from './modal-controller.js';
 import { createSyncController } from './sync-controller.js';
 import { StateStore } from './state.js';
@@ -96,10 +96,6 @@ import { StateStore } from './state.js';
     render();
   }
 
-  function isNormalUrl(url) {
-    return !!url && !url.startsWith('chrome://') && !url.startsWith('chrome-extension://');
-  }
-
   const modalController = createModalController({
     dom,
     deleteGroup: groupName => store.deleteGroup(groupName),
@@ -186,7 +182,7 @@ import { StateStore } from './state.js';
   addCurrentBtn.addEventListener('click', () => {
     chrome.storage.local.get([STORAGE_KEYS.recentPage], result => {
       const recent = result[STORAGE_KEYS.recentPage];
-      if (!recent || !isNormalUrl(recent.url)) {
+      if (!recent || !isHttpUrl(recent.url)) {
         setQuickActionStatus('No recent page to add. Please open a website first, then return.', 'err');
         modalController.fillAddLinkModal('', '', store.selectedGroup);
         return;
@@ -224,13 +220,9 @@ import { StateStore } from './state.js';
   });
 
   cleanupFaviconsBtn.addEventListener('click', () => {
-    const now = Date.now();
-    store.faviconCache = Object.fromEntries(
-      Object.entries(store.faviconCache).filter(([, entry]) =>
-        entry?.dataUrl && now - (entry.updatedAt || 0) <= FAVICON_CACHE_TTL
-      )
-    );
+    store.faviconCache = {};
     store.persistFaviconCache();
+    render();
   });
 
   const syncController = createSyncController({
@@ -317,7 +309,6 @@ import { StateStore } from './state.js';
     requestAnimationFrame(() => {
       document.body.classList.remove('app-loading');
     });
-    syncController.refreshStatus();
     syncController.bootstrapCloud({ force: true });
     syncController.startAutoRestore();
   });

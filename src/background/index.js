@@ -1,7 +1,9 @@
+import { isHttpUrl } from '../shared/utils/link-utils.js';
+
 const RECENT_PAGE_KEY = 'recentPage';
 
 function isTrackableUrl(url) {
-  return !!url && !url.startsWith('chrome://') && !url.startsWith('chrome-extension://');
+  return isHttpUrl(url);
 }
 
 function extractTitle(url, fallbackTitle) {

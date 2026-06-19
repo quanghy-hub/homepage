@@ -1,6 +1,6 @@
 import { DEFAULT_PROFILE_ID } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
-import { getProfileFromState, loadAppData, normalizeProfile, saveAppData } from './storage.js';
+import { getProfileFromState, loadAppData, normalizeLinks, normalizeProfile, saveAppData } from './storage.js';
 
 export class StateStore {
   constructor() {
@@ -257,7 +257,7 @@ export class StateStore {
     if (!imported || typeof imported !== 'object') return;
 
     if (Array.isArray(imported.links)) {
-      this.links = imported.links;
+      this.links = normalizeLinks(imported.links);
     }
 
     if (Array.isArray(imported.groups?.list)) {

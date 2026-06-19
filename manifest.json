@@ -9,7 +9,8 @@
   },
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "favicon"
   ],
   "host_permissions": [
     "https://www.google.com/*",
@@ -17,7 +18,8 @@
     "https://*.workers.dev/*"
   ],
   "background": {
-    "service_worker": "src/background/index.js"
+    "service_worker": "src/background/index.js",
+    "type": "module"
   },
   "icons": {
     "16": "assets/icons/icon16.png",

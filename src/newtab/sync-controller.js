@@ -69,23 +69,6 @@ export function createSyncController({
     }
   }
 
-  async function pullFromCloudflare(showStatus = true) {
-    if (showStatus) setSyncStatus('Pulling from cloud...');
-
-    const config = getSyncSettings(dom);
-    const imported = await pullCloudflareState(config.workerUrl, config.apiCode);
-    applyRemoteState(imported);
-    syncReady = true;
-    saveSyncReady(true);
-    saveData({ skipAutoSync: true });
-    render();
-    refreshSettingsControls();
-
-    if (showStatus) {
-      setSyncStatus(`✓ Pulled successfully · ${revisionText(imported.revision)} · ${formatSyncStamp()}`, 'ok');
-    }
-  }
-
   async function pushToCloudflare(showStatus = true) {
     persistCurrentProfile();
     if (showStatus) setSyncStatus('Pushing to B...');
@@ -235,7 +218,6 @@ export function createSyncController({
     clearInterval(autoRestoreTimer);
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) {
-      refreshStatus();
       return;
     }
 
@@ -246,9 +228,6 @@ export function createSyncController({
         setSyncStatus('✗ Auto restore error: ' + err.message, 'err');
       });
     }, intervalMs);
-  }
-
-  function refreshStatus() {
   }
 
   function bind() {
@@ -299,17 +278,6 @@ export function createSyncController({
       }
     });
 
-    dom.syncPull?.addEventListener('click', async () => {
-      dom.syncPull.disabled = true;
-      try {
-        await pullFromCloudflare(true);
-      } catch (err) {
-        setSyncStatus('✗ Error: ' + err.message, 'err');
-      } finally {
-        dom.syncPull.disabled = false;
-      }
-    });
-
     dom.syncRestoreA?.addEventListener('click', async () => {
       dom.syncRestoreA.disabled = true;
       try {
@@ -344,9 +312,6 @@ export function createSyncController({
     loadSavedStatuses: () => loadSavedSyncStatuses(dom),
     scheduleAutoSync,
     bootstrapCloud,
-    refreshStatus,
-    startAutoRestore,
-    setVerifyStatus,
-    pull: pullFromCloudflare
+    startAutoRestore
   };
 }

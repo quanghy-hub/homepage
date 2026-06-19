@@ -51,7 +51,6 @@ export function getDomRefs() {
         verifySyncBtn: document.getElementById('verify-sync'),
         syncVerifyStatus: document.getElementById('sync-verify-status'),
         syncPush: document.getElementById('sync-push'),
-        syncPull: document.getElementById('sync-pull'),
         syncRestoreA: document.getElementById('sync-restore-a'),
         syncRestoreB: document.getElementById('sync-restore-b'),
         syncStatus: document.getElementById('sync-status')

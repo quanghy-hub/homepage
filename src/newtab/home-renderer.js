@@ -1,6 +1,5 @@
-import { autoTitle, getFaviconCacheKey, getFaviconCandidates, getHostname } from '../shared/utils/link-utils.js';
-
-export const FAVICON_CACHE_TTL = 1000 * 60 * 60 * 24 * 14;
+import { autoTitle } from '../shared/utils/link-utils.js';
+import { createFaviconController } from './favicon-controller.js';
 
 export function createHomeRenderer({
   dom,
@@ -13,7 +12,11 @@ export function createHomeRenderer({
   persistFaviconCache,
   queueIdleTask
 }) {
-  const faviconPending = new Map();
+  const faviconController = createFaviconController({
+    getFaviconCache,
+    persistFaviconCache,
+    queueIdleTask
+  });
 
   function applySettings() {
     const settings = getSettings();
@@ -21,72 +24,6 @@ export function createHomeRenderer({
     const cell = sz + 20;
     document.documentElement.style.setProperty('--icon-size', sz + 'px');
     document.documentElement.style.setProperty('--icon-cell', cell + 'px');
-  }
-
-  function getCachedFavicon(url) {
-    const faviconKey = getFaviconCacheKey(url);
-    if (!faviconKey) return '';
-
-    const entry = getFaviconCache()[faviconKey];
-    if (!entry?.dataUrl) return '';
-
-    return entry.dataUrl;
-  }
-
-  function isFaviconExpired(url) {
-    const faviconKey = getFaviconCacheKey(url);
-    if (!faviconKey) return true;
-    const entry = getFaviconCache()[faviconKey];
-    if (!entry?.dataUrl) return true;
-    return Date.now() - (entry.updatedAt || 0) > FAVICON_CACHE_TTL;
-  }
-
-  async function ensureFaviconCached(url, img, options = {}) {
-    const faviconKey = getFaviconCacheKey(url);
-    const faviconUrls = getFaviconCandidates(url);
-    if (!faviconKey || !faviconUrls.length) return;
-    if (!options.force && faviconPending.has(faviconKey)) return;
-
-    const pending = new Promise(resolve => {
-      try {
-        chrome.runtime.sendMessage({ type: 'fetch-favicon', urls: faviconUrls }, response => {
-          if (chrome.runtime.lastError || !response?.ok || !response.dataUrl) {
-            resolve();
-            return;
-          }
-
-          const dataUrl = response.dataUrl;
-          getFaviconCache()[faviconKey] = {
-            dataUrl,
-            sourceUrl: response.sourceUrl || '',
-            updatedAt: Date.now()
-          };
-          persistFaviconCache();
-          const relatedImgs = document.querySelectorAll(`img[data-favicon-key="${faviconKey}"]`);
-          relatedImgs.forEach(node => {
-            if (!node.isConnected) return;
-            node.src = dataUrl;
-            const item = node.closest('.link-item');
-            const wrap = node.closest('.icon-wrap');
-            item?.classList.remove('fallback-ready');
-            if (wrap) {
-              wrap.textContent = '';
-              wrap.appendChild(node);
-            }
-          });
-          if (img?.isConnected && !relatedImgs.length) {
-            img.src = dataUrl;
-          }
-          resolve();
-        });
-      } catch (_) {
-        resolve();
-      }
-    }).finally(() => {
-      faviconPending.delete(faviconKey);
-    });
-
-    faviconPending.set(faviconKey, pending);
   }
 
   function createLinkEl(link) {
@@ -102,36 +39,7 @@ export function createHomeRenderer({
     iconWrap.className = 'icon-wrap';
 
     const img = document.createElement('img');
-    const hostname = getHostname(link.url);
-    const faviconKey = getFaviconCacheKey(link.url);
-    const cachedFavicon = getCachedFavicon(link.url);
-    img.dataset.hostname = hostname;
-    img.dataset.faviconKey = faviconKey;
-    img.alt = '';
-    img.loading = 'eager';
-    img.decoding = 'async';
-    img.onerror = () => {
-      img.style.display = 'none';
-      iconWrap.textContent = (link.title || '?')[0].toUpperCase();
-      el.classList.add('fallback-ready');
-    };
-    img.onload = () => {
-      if (img.dataset.refreshedLowRes || !img.naturalWidth || !img.naturalHeight) return;
-      if (Math.min(img.naturalWidth, img.naturalHeight) >= 48) return;
-
-      img.dataset.refreshedLowRes = '1';
-      ensureFaviconCached(link.url, img, { force: true });
-    };
-    if (cachedFavicon) {
-      img.src = cachedFavicon;
-      iconWrap.appendChild(img);
-    } else {
-      iconWrap.textContent = (link.title || '?')[0].toUpperCase();
-      el.classList.add('fallback-ready');
-    }
-    if (!cachedFavicon || isFaviconExpired(link.url)) {
-      queueIdleTask(() => ensureFaviconCached(link.url, img));
-    }
+    faviconController.attach({ element: el, iconWrap, img, link });
 
     const label = document.createElement('span');
     label.className = 'icon-label';

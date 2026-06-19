@@ -1,17 +1,24 @@
-export function getHostname(url) {
+export function isHttpUrl(url) {
     try {
         const parsed = new URL(url);
-        return parsed.hostname;
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+export function getDefaultFaviconUrl(url) {
+    if (!isHttpUrl(url)) return '';
+    try {
+        const parsed = new URL(url);
+        return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(parsed.href)}&sz=256`;
     } catch {
         return '';
     }
 }
 
-export function getFavicon(url) {
-    return getFaviconCandidates(url)[0] || '';
-}
-
 export function getFaviconCandidates(url) {
+    if (!isHttpUrl(url)) return [];
     try {
         const parsed = new URL(url);
         const candidates = [];
@@ -20,8 +27,13 @@ export function getFaviconCandidates(url) {
             candidates.push('https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico');
         }
 
-        candidates.push(`https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(parsed.href)}&sz=128`);
-        candidates.push(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsed.hostname)}&sz=128`);
+        candidates.push(getDefaultFaviconUrl(parsed.href));
+        candidates.push(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsed.hostname)}&sz=256`);
+
+        if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+            candidates.push(`chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(parsed.href)}&size=1024`);
+        }
+
         return candidates;
     } catch {
         return [];

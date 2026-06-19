@@ -1,4 +1,4 @@
-import { autoTitle } from '../shared/utils/link-utils.js';
+import { autoTitle, getDefaultFaviconUrl, isHttpUrl } from '../shared/utils/link-utils.js';
 
 export function createModalController({
   dom,
@@ -132,7 +132,12 @@ export function createModalController({
   function saveLink() {
     const links = getLinks();
     const url = inputUrl.value.trim();
-    if (!url) return;
+    if (!isHttpUrl(url)) {
+      inputUrl.setCustomValidity('Enter a valid http:// or https:// URL.');
+      inputUrl.reportValidity();
+      return;
+    }
+    inputUrl.setCustomValidity('');
 
     const title = inputName.value.trim() || autoTitle(url);
     const group = inputGroup.value;
@@ -142,6 +147,7 @@ export function createModalController({
       if (link) {
         const previousGroup = link.parent;
         link.url = url;
+        link.faviconUrl = getDefaultFaviconUrl(url);
         link.title = title;
         link.parent = group;
         normalizeGroupOrders(previousGroup, group);
@@ -154,7 +160,8 @@ export function createModalController({
         order: groupLinks.length,
         parent: group,
         title,
-        url
+        url,
+        faviconUrl: getDefaultFaviconUrl(url)
       });
     }
 
@@ -211,6 +218,7 @@ export function createModalController({
       inputName.value = autoTitle(inputUrl.value);
     }
   });
+  inputUrl.addEventListener('input', () => inputUrl.setCustomValidity(''));
 
   return {
     closeModal,

@@ -1,6 +1,17 @@
 import { DEFAULT_GROUPS, DEFAULT_LINKS, DEFAULT_PROFILE_ID, DEFAULT_PROFILES, DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
 import { deepClone } from '../shared/utils/clone.js';
+import { getDefaultFaviconUrl, isHttpUrl } from '../shared/utils/link-utils.js';
+
+export function normalizeLinks(links) {
+    if (!Array.isArray(links)) return [];
+    return links
+        .filter(link => link && typeof link === 'object' && isHttpUrl(link.url))
+        .map(link => ({
+            ...link,
+            faviconUrl: getDefaultFaviconUrl(link.url)
+        }));
+}
 
 function normalizePinned(value) {
     if (Array.isArray(value)) return value;
@@ -46,13 +57,13 @@ export function loadAppData(state) {
             state.profileId = result[STORAGE_KEYS.syncProfile] || DEFAULT_PROFILE_ID;
 
             if (result[STORAGE_KEYS.links] && result[STORAGE_KEYS.links].length > 0) {
-                state.links = result[STORAGE_KEYS.links];
+                state.links = normalizeLinks(result[STORAGE_KEYS.links]);
                 state.groups = result[STORAGE_KEYS.groups] || deepClone(DEFAULT_GROUPS);
                 if (typeof state.groups.pinned === 'string') {
                     state.groups.pinned = [state.groups.pinned];
                 }
             } else {
-                state.links = deepClone(DEFAULT_LINKS);
+                state.links = normalizeLinks(deepClone(DEFAULT_LINKS));
                 state.groups = deepClone(DEFAULT_GROUPS);
             }
 
