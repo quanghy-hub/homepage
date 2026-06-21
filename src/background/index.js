@@ -69,6 +69,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       let lastError = null;
 
       for (const url of urls.filter(Boolean)) {
+        if (!isHttpUrl(url)) continue;
         try {
           const res = await fetch(url, { cache: 'force-cache' });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);

@@ -1,6 +1,6 @@
 # Chrome Web Store Listing — Homepage
 
-> Last Updated: 2026-06-19
+> Last Updated: 2026-06-20
 
 ## Store Listing
 
@@ -79,6 +79,7 @@ Successful images are cached locally for 14 days. Clearing the favicon cache tri
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
+| 1.0.3 | 2026-06-20 | Fixed Chrome favicon loading to load directly (bypassing background fetch/cache) and improved fallback letter extraction for Unicode/emojis and whitespace. | Draft |
 | 1.0.2 | 2026-06-19 | Added Google-first, Chrome-second favicon loading with a local uppercase-letter fallback and 14-day cache. | Draft |
 | 1.0.1 | 2026-06-19 | Added synchronized per-link favicon URLs with a simple Google S2 fallback and 14-day local image cache. | Draft |
 | 1.0.0 | 2026-06-19 | Initial release with customizable groups, Cloudflare sync, and crisp icon support. | Draft |

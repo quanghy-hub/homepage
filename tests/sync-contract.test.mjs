@@ -24,7 +24,11 @@ test('worker stores the active profile and creates revisioned state', async () =
     baseRevision: 0,
     groups: { list: ['A'] },
     links: [{ _id: 'one', parent: 'A', url: 'https://example.com/' }],
-    profile: { pinned: ['A'], selected: 'A', settings: { iconSize: 56 } },
+    profile: {
+      pinned: ['A'],
+      selected: 'A',
+      settings: { iconSize: 56 }
+    },
     profileId: 'macbook'
   });
 

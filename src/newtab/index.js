@@ -1,4 +1,3 @@
-import { DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
 import { autoTitle, isHttpUrl } from '../shared/utils/link-utils.js';
 import { getDomRefs } from './dom.js';
@@ -6,7 +5,9 @@ import { bindDragDrop } from './drag-drop.js';
 import { bindEditModeActivation } from './edit-mode.js';
 import { createHomeRenderer } from './home-renderer.js';
 import { createModalController } from './modal-controller.js';
+import { createSettingsController } from './settings-controller.js';
 import { createSyncController } from './sync-controller.js';
+import { normalizeSettings } from './storage.js';
 import { StateStore } from './state.js';
 
 (() => {
@@ -20,12 +21,6 @@ import { StateStore } from './state.js';
   const {
     addCurrentBtn,
     quickActionStatus,
-    settingsBtn,
-    settingsOverlay,
-    settingIconSize,
-    settingIconSizeVal,
-    cleanupFaviconsBtn,
-    settingsClose,
     syncProfileSelect
   } = dom;
   const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
@@ -36,8 +31,7 @@ import { StateStore } from './state.js';
   store.onScheduleSync = scheduleAutoSync;
 
   function refreshSettingsControls() {
-    settingIconSize.value = store.settings.iconSize;
-    settingIconSizeVal.textContent = store.settings.iconSize + 'px';
+    settingsController?.refreshControls();
     syncProfileSelect.value = store.profileId;
   }
 
@@ -68,6 +62,19 @@ import { StateStore } from './state.js';
   function applySettings() {
     homeRenderer.applySettings();
   }
+
+  const settingsController = createSettingsController({
+    applySettings,
+    clearFaviconCache: () => {
+      store.faviconCache = {};
+      store.persistFaviconCache();
+    },
+    dom,
+    getSettings: () => store.settings,
+    loadSyncCredentials: () => syncController.loadSavedCredentials(),
+    render,
+    saveData: () => store.saveData()
+  });
 
   /* ========== RENDERING ========== */
   function render() {
@@ -193,38 +200,6 @@ import { StateStore } from './state.js';
     });
   });
 
-  /* ========== SETTINGS PANEL ========== */
-  settingsBtn.addEventListener('click', openSettings);
-
-  function openSettings() {
-    settingsOverlay.classList.remove('hidden');
-    refreshSettingsControls();
-    syncController.loadSavedCredentials();
-  }
-
-  function closeSettings() {
-    settingsOverlay.classList.add('hidden');
-  }
-
-  settingsClose.addEventListener('click', closeSettings);
-  settingsOverlay.addEventListener('click', e => {
-    if (e.target === settingsOverlay) closeSettings();
-  });
-
-  settingIconSize.addEventListener('input', () => {
-    const val = parseInt(settingIconSize.value);
-    settingIconSizeVal.textContent = val + 'px';
-    store.settings.iconSize = val;
-    store.saveData();
-    applySettings();
-  });
-
-  cleanupFaviconsBtn.addEventListener('click', () => {
-    store.faviconCache = {};
-    store.persistFaviconCache();
-    render();
-  });
-
   const syncController = createSyncController({
     applyImportedState: imported => store.applyImportedState(imported),
     dom,
@@ -242,7 +217,7 @@ import { StateStore } from './state.js';
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       modalController.closeModal();
-      closeSettings();
+      settingsController.close();
       exitEditMode();
     }
   });
@@ -258,7 +233,7 @@ import { StateStore } from './state.js';
         shouldApplyActiveProfile = true;
       }
       if (changes.settings) {
-        store.settings = Object.assign({}, DEFAULT_SETTINGS, changes.settings.newValue || {});
+        store.settings = normalizeSettings(changes.settings.newValue);
       }
       if (changes.profiles) {
         store.profiles = changes.profiles.newValue || store.profiles;

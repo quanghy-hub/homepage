@@ -1,4 +1,10 @@
-import { getFaviconCacheKey, getFaviconCandidates } from '../shared/utils/link-utils.js';
+import {
+  FAVICON_SOURCES,
+  getFaviconCacheKey,
+  getFaviconCandidates,
+  getFaviconUrl,
+  normalizeFaviconSource
+} from '../shared/utils/link-utils.js';
 
 export const FAVICON_CACHE_TTL = 1000 * 60 * 60 * 24 * 14;
 
@@ -15,8 +21,9 @@ export function createFaviconController({
   }
 
   function showFallback(element, iconWrap, img, title) {
-    img.style && (img.style.display = 'none');
-    iconWrap.textContent = (title || '?')[0].toUpperCase();
+    if (img.style) img.style.display = 'none';
+    const cleanTitle = (title || '').trim() || '?';
+    iconWrap.textContent = [...cleanTitle][0].toUpperCase();
     element.classList.add('fallback-ready');
   }
 
@@ -80,22 +87,31 @@ export function createFaviconController({
   }
 
   function attach({ element, iconWrap, img, link }) {
-    const key = getFaviconCacheKey(link.url);
-    const entry = getCacheEntry(link.url);
-    const isFresh = entry?.dataUrl
-      && Date.now() - (entry.updatedAt || 0) <= FAVICON_CACHE_TTL;
+    const faviconSource = normalizeFaviconSource(link.faviconSource);
 
-    img.dataset.faviconKey = key;
     img.alt = '';
     img.loading = 'eager';
     img.decoding = 'async';
     img.onerror = () => showFallback(element, iconWrap, img, link.title);
+
+    if (faviconSource === FAVICON_SOURCES.chrome) {
+      img.src = getFaviconUrl(link.url, FAVICON_SOURCES.chrome);
+      iconWrap.appendChild(img);
+      return;
+    }
+
+    const key = getFaviconCacheKey(link.url);
+    img.dataset.faviconKey = key;
     img.onload = () => {
       if (img.dataset.refreshedLowRes || !img.naturalWidth || !img.naturalHeight) return;
       if (Math.min(img.naturalWidth, img.naturalHeight) >= 48) return;
       img.dataset.refreshedLowRes = '1';
       fetchAndCache({ element, iconWrap, img, link }, true);
     };
+
+    const entry = getCacheEntry(link.url);
+    const isFresh = entry?.dataUrl
+      && Date.now() - (entry.updatedAt || 0) <= FAVICON_CACHE_TTL;
 
     if (entry?.dataUrl) {
       img.src = entry.dataUrl;

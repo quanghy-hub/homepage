@@ -1,4 +1,10 @@
-import { autoTitle, getDefaultFaviconUrl, isHttpUrl } from '../shared/utils/link-utils.js';
+import {
+  autoTitle,
+  FAVICON_SOURCES,
+  getFaviconUrl,
+  isHttpUrl
+} from '../shared/utils/link-utils.js';
+import { createFaviconSourcePicker } from './favicon-source-picker.js';
 
 export function createModalController({
   dom,
@@ -23,6 +29,10 @@ export function createModalController({
     inputUrl,
     inputName,
     inputGroup,
+    faviconSourceOptions,
+    faviconSourceInputs,
+    faviconPreviewGoogle,
+    faviconPreviewChrome,
     inputGroupName,
     modalPin,
     modalDelete,
@@ -33,6 +43,14 @@ export function createModalController({
   let editingLinkId = null;
   let editingGroupName = null;
   let modalMode = null;
+
+  const faviconPicker = createFaviconSourcePicker({
+    inputs: faviconSourceInputs,
+    previews: [
+      { element: faviconPreviewGoogle, source: FAVICON_SOURCES.google },
+      { element: faviconPreviewChrome, source: FAVICON_SOURCES.chrome }
+    ]
+  });
 
   function openModal(mode, link = null, defaultGroup = null) {
     const groups = getGroups();
@@ -74,6 +92,9 @@ export function createModalController({
         inputUrl.value = link.url;
         inputName.value = link.title;
         inputGroup.value = link.parent;
+        faviconPicker.setSelected(link.faviconSource);
+        faviconSourceOptions.classList.remove('hidden');
+        faviconPicker.refresh(link.url);
         editingLinkId = link._id;
         modalDelete.classList.remove('hidden');
       } else {
@@ -81,6 +102,8 @@ export function createModalController({
         inputUrl.value = '';
         inputName.value = '';
         inputGroup.value = defaultGroup || getSelectedGroup();
+        faviconPicker.setSelected(FAVICON_SOURCES.google);
+        faviconSourceOptions.classList.add('hidden');
         editingLinkId = null;
       }
       inputUrl.focus();
@@ -141,13 +164,14 @@ export function createModalController({
 
     const title = inputName.value.trim() || autoTitle(url);
     const group = inputGroup.value;
-
+    const faviconSource = faviconPicker.getSelected();
     if (editingLinkId) {
       const link = links.find(item => item._id === editingLinkId);
       if (link) {
         const previousGroup = link.parent;
         link.url = url;
-        link.faviconUrl = getDefaultFaviconUrl(url);
+        link.faviconSource = faviconSource;
+        link.faviconUrl = getFaviconUrl(url, faviconSource);
         link.title = title;
         link.parent = group;
         normalizeGroupOrders(previousGroup, group);
@@ -161,7 +185,8 @@ export function createModalController({
         parent: group,
         title,
         url,
-        faviconUrl: getDefaultFaviconUrl(url)
+        faviconSource: FAVICON_SOURCES.google,
+        faviconUrl: getFaviconUrl(url, FAVICON_SOURCES.google)
       });
     }
 
@@ -218,7 +243,10 @@ export function createModalController({
       inputName.value = autoTitle(inputUrl.value);
     }
   });
-  inputUrl.addEventListener('input', () => inputUrl.setCustomValidity(''));
+  inputUrl.addEventListener('input', () => {
+    inputUrl.setCustomValidity('');
+    if (modalMode === 'edit-link') faviconPicker.refresh(inputUrl.value.trim());
+  });
 
   return {
     closeModal,

@@ -1,16 +1,32 @@
 import { DEFAULT_GROUPS, DEFAULT_LINKS, DEFAULT_PROFILE_ID, DEFAULT_PROFILES, DEFAULT_SETTINGS } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
 import { deepClone } from '../shared/utils/clone.js';
-import { getDefaultFaviconUrl, isHttpUrl } from '../shared/utils/link-utils.js';
+import {
+    getDefaultFaviconUrl,
+    getFaviconUrl,
+    isHttpUrl,
+    normalizeFaviconSource
+} from '../shared/utils/link-utils.js';
+
+export function normalizeSettings(settings) {
+    const iconSize = Number(settings?.iconSize);
+    return {
+        iconSize: Number.isFinite(iconSize) ? iconSize : DEFAULT_SETTINGS.iconSize
+    };
+}
 
 export function normalizeLinks(links) {
     if (!Array.isArray(links)) return [];
     return links
         .filter(link => link && typeof link === 'object' && isHttpUrl(link.url))
-        .map(link => ({
-            ...link,
-            faviconUrl: getDefaultFaviconUrl(link.url)
-        }));
+        .map(link => {
+            const faviconSource = normalizeFaviconSource(link.faviconSource);
+            return {
+                ...link,
+                faviconSource,
+                faviconUrl: getFaviconUrl(link.url, faviconSource) || getDefaultFaviconUrl(link.url)
+            };
+        });
 }
 
 function normalizePinned(value) {
@@ -33,7 +49,7 @@ export function normalizeProfile(profile, fallbackGroups = DEFAULT_GROUPS, fallb
     return {
         pinned: safePinned,
         selected: normalizeSelected(source.selected ?? fallbackGroups.selected, groupList, safePinned),
-        settings: Object.assign({}, DEFAULT_SETTINGS, fallbackSettings || {}, source.settings || {})
+        settings: normalizeSettings(Object.assign({}, fallbackSettings || {}, source.settings || {}))
     };
 }
 
@@ -67,7 +83,7 @@ export function loadAppData(state) {
                 state.groups = deepClone(DEFAULT_GROUPS);
             }
 
-            state.settings = Object.assign({}, DEFAULT_SETTINGS, result[STORAGE_KEYS.settings] || {});
+            state.settings = normalizeSettings(result[STORAGE_KEYS.settings]);
             const savedProfiles = result[STORAGE_KEYS.profiles] || {};
             state.profiles = Object.assign(deepClone(DEFAULT_PROFILES), savedProfiles);
 

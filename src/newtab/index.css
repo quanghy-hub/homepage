@@ -479,6 +479,64 @@ body.edit-mode .pinned-group-header:active {
   font-weight: 500;
 }
 
+.favicon-source-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.favicon-source-options legend {
+  margin-bottom: 7px;
+  font-size: 12px;
+  color: #8b949e;
+  font-weight: 500;
+}
+
+.modal .favicon-source-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #0d1117;
+  color: #c9d1d9;
+  cursor: pointer;
+}
+
+.favicon-source-option:has(input:checked) {
+  border-color: #388bfd;
+  background: rgba(31, 111, 235, 0.12);
+}
+
+.favicon-source-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.favicon-source-option:has(input:focus-visible) {
+  outline: 2px solid #58a6ff;
+  outline-offset: 2px;
+}
+
+.favicon-source-option img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 5px;
+}
+
+.favicon-source-option img:not([src]) {
+  visibility: hidden;
+}
+
 .settings-slider-row {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);

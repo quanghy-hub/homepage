@@ -7,6 +7,15 @@ export function isHttpUrl(url) {
     }
 }
 
+export const FAVICON_SOURCES = Object.freeze({
+    google: 'google',
+    chrome: 'chrome'
+});
+
+export function normalizeFaviconSource(source) {
+    return source === FAVICON_SOURCES.chrome ? FAVICON_SOURCES.chrome : FAVICON_SOURCES.google;
+}
+
 export function getDefaultFaviconUrl(url) {
     if (!isHttpUrl(url)) return '';
     try {
@@ -15,6 +24,16 @@ export function getDefaultFaviconUrl(url) {
     } catch {
         return '';
     }
+}
+
+export function getFaviconUrl(url, source = FAVICON_SOURCES.google) {
+    if (!isHttpUrl(url)) return '';
+    const selectedSource = normalizeFaviconSource(source);
+    if (selectedSource === FAVICON_SOURCES.google) return getDefaultFaviconUrl(url);
+    const parsed = new URL(url);
+
+    if (typeof chrome === 'undefined' || !chrome.runtime?.id) return '';
+    return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(parsed.href)}&size=1024`;
 }
 
 export function getFaviconCandidates(url) {
@@ -29,10 +48,6 @@ export function getFaviconCandidates(url) {
 
         candidates.push(getDefaultFaviconUrl(parsed.href));
         candidates.push(`https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsed.hostname)}&sz=256`);
-
-        if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-            candidates.push(`chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(parsed.href)}&size=1024`);
-        }
 
         return candidates;
     } catch {
