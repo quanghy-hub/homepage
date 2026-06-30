@@ -47,11 +47,6 @@ export function getDomRefs() {
             set value(val) { setRadioVal('sync-profile', val); },
             addEventListener(event, cb) { addRadioListener('sync-profile', event, cb); }
         },
-        syncModeSelect: {
-            get value() { return getRadioVal('sync-mode') || 'auto'; },
-            set value(val) { setRadioVal('sync-mode', val); },
-            addEventListener(event, cb) { addRadioListener('sync-mode', event, cb); }
-        },
         verifySyncBtn: document.getElementById('verify-sync'),
         syncVerifyStatus: document.getElementById('sync-verify-status'),
         syncPush: document.getElementById('sync-push'),

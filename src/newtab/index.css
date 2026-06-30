@@ -440,7 +440,6 @@ body.edit-mode .pinned-group-header:active {
   color: #e6edf3;
 }
 
-.group-header,
 .pinned-group-header {
   font-size: 12px;
   font-weight: 500;

@@ -6,7 +6,6 @@ export const STORAGE_KEYS = {
     syncWorkerUrl: 'syncWorkerUrl',
     syncApiCode: 'syncApiCode',
     syncProfile: 'syncProfile',
-    syncMode: 'syncMode',
     syncDelaySeconds: 'syncDelaySeconds',
     syncReady: 'syncReady',
     syncRevision: 'syncRevision',

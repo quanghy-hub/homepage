@@ -241,7 +241,7 @@ export function createSyncController({
             setSyncStatus('✗ Cloud check error: ' + err.message, 'err');
           });
       },
-      onDelayChange: (delaySeconds) => {
+      onDelayChange: () => {
         const hasPendingPush = !!autoSyncTimer;
         startAutoRestore();
         if (hasPendingPush) {

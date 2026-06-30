@@ -56,11 +56,8 @@ export function loadSavedSyncStatuses(dom) {
 export function getSyncSettings(dom) {
     const workerUrl = dom.syncWorkerUrlInput.value.trim().replace(/\/+$/, '');
     const apiCode = dom.syncApiCodeInput.value.trim();
-    const profileId = PROFILE_IDS.includes(dom.syncProfileSelect.value)
-        ? dom.syncProfileSelect.value
-        : DEFAULT_PROFILE_ID;
     const delaySeconds = normalizeDelaySeconds(dom.syncDelayInput?.value);
-    return { workerUrl, apiCode, profileId, syncMode: 'auto', delaySeconds };
+    return { workerUrl, apiCode, delaySeconds };
 }
 
 export function bindSyncCredentialInputs(dom, handlers = {}) {
@@ -94,12 +91,10 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
         const delaySeconds = normalizeDelaySeconds(dom.syncDelayInput?.value);
         if (dom.syncDelayInput) dom.syncDelayInput.value = String(delaySeconds);
         chrome.storage.local.set({ [STORAGE_KEYS.syncDelaySeconds]: delaySeconds });
-        if (onDelayChange) onDelayChange(delaySeconds);
+        if (onDelayChange) onDelayChange();
     };
     dom.syncDelayInput?.addEventListener('change', saveSyncDelay);
     dom.syncDelayInput?.addEventListener('blur', saveSyncDelay);
-
-    chrome.storage.local.set({ [STORAGE_KEYS.syncMode]: 'auto' });
 }
 
 export function loadSavedSyncCredentials(dom) {
@@ -115,7 +110,6 @@ export function loadSavedSyncCredentials(dom) {
             dom.syncProfileSelect.value = PROFILE_IDS.includes(result[STORAGE_KEYS.syncProfile])
                 ? result[STORAGE_KEYS.syncProfile]
                 : DEFAULT_PROFILE_ID;
-            if (dom.syncModeSelect) dom.syncModeSelect.value = 'auto';
             if (dom.syncDelayInput) {
                 const savedDelay = Number(result[STORAGE_KEYS.syncDelaySeconds]);
                 dom.syncDelayInput.value = String(normalizeDelaySeconds(savedDelay));
