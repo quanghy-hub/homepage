@@ -160,6 +160,11 @@ export function createSyncController({
     try {
       const config = getSyncSettings(dom);
       const remote = await pullCloudflareState(config.workerUrl, config.apiCode);
+      
+      if (dom.syncStatus && dom.syncStatus.textContent.startsWith('✗ Auto restore error')) {
+        setSyncStatus('');
+      }
+
       const remoteRevision = Number.isSafeInteger(remote?.revision) ? remote.revision : 0;
       const localRevision = Number.isSafeInteger(getRevision()) ? getRevision() : 0;
 
@@ -225,6 +230,10 @@ export function createSyncController({
     autoRestoreTimer = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
       restoreLatestFromB(false).catch(err => {
+        if (err.message === 'Failed to fetch') {
+          console.warn('Auto restore background fetch failed (transient network issue).');
+          return;
+        }
         setSyncStatus('✗ Auto restore error: ' + err.message, 'err');
       });
     }, intervalMs);
