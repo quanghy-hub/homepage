@@ -284,7 +284,7 @@ import { StateStore } from './state.js';
     requestAnimationFrame(() => {
       document.body.classList.remove('app-loading');
     });
-    syncController.bootstrapCloud({ force: true });
+    syncController.bootstrapCloud({ force: true }).catch(() => {});
     syncController.startAutoRestore();
   });
 

@@ -214,6 +214,13 @@ export function createSyncController({
       syncReady = true;
       saveSyncReady(true);
       return true;
+    } catch (err) {
+      if (err.message === 'Failed to fetch') {
+        setSyncStatus('✗ Cloud check failed (network/worker offline)', 'err');
+      } else {
+        setSyncStatus('✗ Cloud check error: ' + err.message, 'err');
+      }
+      return false;
     } finally {
       isBootstrapping = false;
     }
@@ -231,7 +238,6 @@ export function createSyncController({
       if (document.visibilityState === 'hidden') return;
       restoreLatestFromB(false).catch(err => {
         if (err.message === 'Failed to fetch') {
-          console.warn('Auto restore background fetch failed (transient network issue).');
           return;
         }
         setSyncStatus('✗ Auto restore error: ' + err.message, 'err');

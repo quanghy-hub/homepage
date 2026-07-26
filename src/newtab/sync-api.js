@@ -1,14 +1,26 @@
 export const SYNC_APP_ID = 'homepage';
 export const BACKUP_SLOTS = ['a', 'b'];
 
-export function getStateEndpoint(workerUrl) {
+export function normalizeWorkerUrl(workerUrl) {
     if (!workerUrl) return '';
-    return `${workerUrl.replace(/\/+$/, '')}/sync/${SYNC_APP_ID}/state`;
+    const trimmed = String(workerUrl).trim().replace(/\/+$/, '');
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+    }
+    return `https://${trimmed}`;
+}
+
+export function getStateEndpoint(workerUrl) {
+    const normalized = normalizeWorkerUrl(workerUrl);
+    if (!normalized) return '';
+    return `${normalized}/sync/${SYNC_APP_ID}/state`;
 }
 
 export function getBackupEndpoint(workerUrl, slot) {
-    if (!workerUrl) return '';
-    return `${workerUrl.replace(/\/+$/, '')}/sync/${SYNC_APP_ID}/backup/${slot}`;
+    const normalized = normalizeWorkerUrl(workerUrl);
+    if (!normalized) return '';
+    return `${normalized}/sync/${SYNC_APP_ID}/backup/${slot}`;
 }
 
 export function getSyncHeaders(apiCode) {

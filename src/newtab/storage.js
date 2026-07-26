@@ -42,13 +42,14 @@ function normalizeSelected(value, list, pinned) {
 
 export function normalizeProfile(profile, fallbackGroups = DEFAULT_GROUPS, fallbackSettings = DEFAULT_SETTINGS) {
     const source = profile && typeof profile === 'object' ? profile : {};
-    const groupList = Array.isArray(fallbackGroups.list) ? fallbackGroups.list : DEFAULT_GROUPS.list;
-    const pinned = normalizePinned(source.pinned ?? fallbackGroups.pinned).filter(g => groupList.includes(g));
-    const safePinned = pinned.length ? pinned : deepClone(DEFAULT_GROUPS.pinned).filter(g => groupList.includes(g));
+    const groupList = Array.isArray(fallbackGroups?.list) ? fallbackGroups.list : DEFAULT_GROUPS.list;
+    const fallbackPinned = Array.isArray(fallbackGroups?.pinned) ? fallbackGroups.pinned : DEFAULT_GROUPS.pinned;
+    const pinned = normalizePinned(source.pinned ?? fallbackPinned).filter(g => groupList.includes(g));
+    const safePinned = pinned.length ? pinned : deepClone(fallbackPinned).filter(g => groupList.includes(g));
 
     return {
         pinned: safePinned,
-        selected: normalizeSelected(source.selected ?? fallbackGroups.selected, groupList, safePinned),
+        selected: normalizeSelected(source.selected ?? fallbackGroups?.selected, groupList, safePinned),
         settings: normalizeSettings(Object.assign({}, fallbackSettings || {}, source.settings || {}))
     };
 }
