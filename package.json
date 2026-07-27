@@ -11,7 +11,8 @@
     "lint": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\"",
     "lint:fix": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\" --fix",
     "format": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "build:zip": "mkdir -p /Users/best/github/extension && zip -r /Users/best/github/extension/homepage.zip src assets manifest.json README.md"
   },
   "lint-staged": {
     "*.{js,mjs}": [
