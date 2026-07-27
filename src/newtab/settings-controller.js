@@ -34,7 +34,7 @@ export function createSettingsController({
 
   settingsBtn.addEventListener('click', open);
   settingsClose.addEventListener('click', close);
-  settingsOverlay.addEventListener('click', event => {
+  settingsOverlay.addEventListener('click', (event) => {
     if (event.target === settingsOverlay) close();
   });
 

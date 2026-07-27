@@ -8,11 +8,7 @@ import {
 
 export const FAVICON_CACHE_TTL = 1000 * 60 * 60 * 24 * 14;
 
-export function createFaviconController({
-  getFaviconCache,
-  persistFaviconCache,
-  queueIdleTask
-}) {
+export function createFaviconController({ getFaviconCache, persistFaviconCache, queueIdleTask }) {
   const pendingByKey = new Map();
 
   function getCacheEntry(url) {
@@ -28,11 +24,12 @@ export function createFaviconController({
   }
 
   function updateVisibleImages(key, dataUrl, fallbackTarget) {
-    const relatedImages = typeof document === 'undefined'
-      ? []
-      : document.querySelectorAll(`img[data-favicon-key="${key}"]`);
+    const relatedImages =
+      typeof document === 'undefined'
+        ? []
+        : document.querySelectorAll(`img[data-favicon-key="${key}"]`);
 
-    relatedImages.forEach(node => {
+    relatedImages.forEach((node) => {
       if (!node.isConnected) return;
       node.style.display = '';
       node.src = dataUrl;
@@ -56,14 +53,14 @@ export function createFaviconController({
   }
 
   function fetchAndCache(target, force = false) {
-    const { link, img } = target;
+    const { link } = target;
     const key = getFaviconCacheKey(link.url);
     const urls = getFaviconCandidates(link.url);
     if (!key || !urls.length || (!force && pendingByKey.has(key))) return;
 
-    const pending = new Promise(resolve => {
+    const pending = new Promise((resolve) => {
       try {
-        chrome.runtime.sendMessage({ type: 'fetch-favicon', urls }, response => {
+        chrome.runtime.sendMessage({ type: 'fetch-favicon', urls }, (response) => {
           if (chrome.runtime.lastError || !response?.ok || !response.dataUrl) {
             resolve();
             return;
@@ -110,8 +107,7 @@ export function createFaviconController({
     };
 
     const entry = getCacheEntry(link.url);
-    const isFresh = entry?.dataUrl
-      && Date.now() - (entry.updatedAt || 0) <= FAVICON_CACHE_TTL;
+    const isFresh = entry?.dataUrl && Date.now() - (entry.updatedAt || 0) <= FAVICON_CACHE_TTL;
 
     if (entry?.dataUrl) {
       img.src = entry.dataUrl;

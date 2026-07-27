@@ -1,6 +1,12 @@
 import { DEFAULT_PROFILE_ID } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
-import { getProfileFromState, loadAppData, normalizeLinks, normalizeProfile, saveAppData } from './storage.js';
+import {
+  getProfileFromState,
+  loadAppData,
+  normalizeLinks,
+  normalizeProfile,
+  saveAppData
+} from './storage.js';
 
 export class StateStore {
   constructor() {
@@ -41,8 +47,8 @@ export class StateStore {
   }
 
   loadFaviconCache() {
-    return new Promise(resolve => {
-      chrome.storage.local.get([STORAGE_KEYS.faviconCache], result => {
+    return new Promise((resolve) => {
+      chrome.storage.local.get([STORAGE_KEYS.faviconCache], (result) => {
         this.faviconCache = result[STORAGE_KEYS.faviconCache] || {};
         resolve();
       });
@@ -80,9 +86,13 @@ export class StateStore {
   }
 
   applyActiveProfileToGroups() {
-    const activeProfile = normalizeProfile(this.profiles[this.profileId], this.groups, this.settings);
+    const activeProfile = normalizeProfile(
+      this.profiles[this.profileId],
+      this.groups,
+      this.settings
+    );
     this.profiles[this.profileId] = activeProfile;
-    this.groups.pinned = activeProfile.pinned;
+    this.groups.pinned = [...activeProfile.pinned];
     this.groups.selected = activeProfile.selected;
     this.settings = activeProfile.settings;
     this.selectedGroup = this.groups.selected;
@@ -95,7 +105,7 @@ export class StateStore {
 
     const nextProfile = normalizeProfile(this.profiles[this.profileId], this.groups, this.settings);
     this.profiles[this.profileId] = nextProfile;
-    this.groups.pinned = nextProfile.pinned;
+    this.groups.pinned = [...nextProfile.pinned];
     this.groups.selected = nextProfile.selected;
     this.settings = nextProfile.settings;
     this.selectedGroup = this.groups.selected;
@@ -106,13 +116,11 @@ export class StateStore {
   }
 
   getLinksForGroup(groupName) {
-    return this.links
-      .filter(l => l.parent === groupName)
-      .sort((a, b) => a.order - b.order);
+    return this.links.filter((l) => l.parent === groupName).sort((a, b) => a.order - b.order);
   }
 
   normalizeGroupOrders(...groupNames) {
-    [...new Set(groupNames.filter(Boolean))].forEach(groupName => {
+    [...new Set(groupNames.filter(Boolean))].forEach((groupName) => {
       this.getLinksForGroup(groupName).forEach((link, index) => {
         link.order = index;
       });
@@ -120,7 +128,7 @@ export class StateStore {
   }
 
   getFallbackSelected(pinned = this.groups.pinned) {
-    return this.groups.list.find(g => !pinned.includes(g)) || this.groups.list[0] || '';
+    return this.groups.list.find((g) => !pinned.includes(g)) || this.groups.list[0] || '';
   }
 
   setSelectedGroup(groupName) {
@@ -129,24 +137,32 @@ export class StateStore {
   }
 
   renameGroupInProfiles(oldName, newName) {
-    Object.keys(this.profiles).forEach(id => {
+    Object.keys(this.profiles).forEach((id) => {
       const profile = this.profiles[id] || {};
       const pinned = Array.isArray(profile.pinned)
-        ? profile.pinned.map(groupName => groupName === oldName ? newName : groupName)
+        ? profile.pinned.map((groupName) => (groupName === oldName ? newName : groupName))
         : this.groups.pinned;
       const selected = profile.selected === oldName ? newName : profile.selected;
-      this.profiles[id] = normalizeProfile({ ...profile, pinned, selected }, this.groups, profile.settings || this.settings);
+      this.profiles[id] = normalizeProfile(
+        { ...profile, pinned, selected },
+        this.groups,
+        profile.settings || this.settings
+      );
     });
   }
 
   removeGroupFromProfiles(groupName) {
-    Object.keys(this.profiles).forEach(id => {
+    Object.keys(this.profiles).forEach((id) => {
       const profile = this.profiles[id] || {};
       const pinned = Array.isArray(profile.pinned)
-        ? profile.pinned.filter(name => name !== groupName)
+        ? profile.pinned.filter((name) => name !== groupName)
         : this.groups.pinned;
       const selected = profile.selected === groupName ? '' : profile.selected;
-      this.profiles[id] = normalizeProfile({ ...profile, pinned, selected }, this.groups, profile.settings || this.settings);
+      this.profiles[id] = normalizeProfile(
+        { ...profile, pinned, selected },
+        this.groups,
+        profile.settings || this.settings
+      );
     });
   }
 
@@ -156,16 +172,16 @@ export class StateStore {
   }
 
   reorderLink(draggedId, targetId, targetGroup) {
-    const dragged = this.links.find(l => l._id === draggedId);
-    const target = this.links.find(l => l._id === targetId);
+    const dragged = this.links.find((l) => l._id === draggedId);
+    const target = this.links.find((l) => l._id === targetId);
     if (!dragged || !target) return;
     const sourceGroup = dragged.parent;
 
     dragged.parent = targetGroup || target.parent;
 
     const groupLinks = this.getLinksForGroup(dragged.parent);
-    const filtered = groupLinks.filter(l => l._id !== draggedId);
-    const targetIdx = filtered.findIndex(l => l._id === targetId);
+    const filtered = groupLinks.filter((l) => l._id !== draggedId);
+    const targetIdx = filtered.findIndex((l) => l._id === targetId);
 
     if (targetIdx !== -1) {
       filtered.splice(targetIdx, 0, dragged);
@@ -173,7 +189,7 @@ export class StateStore {
       filtered.push(dragged);
     }
 
-    filtered.forEach((l, i) => l.order = i);
+    filtered.forEach((l, i) => (l.order = i));
     this.normalizeGroupOrders(sourceGroup, dragged.parent);
 
     this.saveData();
@@ -208,7 +224,7 @@ export class StateStore {
     if (!groupName) return;
 
     if (this.groups.pinned.includes(groupName)) {
-      this.groups.pinned = this.groups.pinned.filter(p => p !== groupName);
+      this.groups.pinned = this.groups.pinned.filter((p) => p !== groupName);
       if (this.selectedGroup === groupName || !this.selectedGroup) {
         this.selectedGroup = this.getFallbackSelected();
       }
@@ -227,9 +243,9 @@ export class StateStore {
   deleteGroup(groupName) {
     if (!groupName || this.groups.list.length <= 2) return;
 
-    this.groups.list = this.groups.list.filter(x => x !== groupName);
-    this.groups.pinned = this.groups.pinned.filter(x => x !== groupName);
-    this.links = this.links.filter(l => l.parent !== groupName);
+    this.groups.list = this.groups.list.filter((x) => x !== groupName);
+    this.groups.pinned = this.groups.pinned.filter((x) => x !== groupName);
+    this.links = this.links.filter((l) => l.parent !== groupName);
 
     if (this.selectedGroup === groupName) {
       this.selectedGroup = this.getFallbackSelected();
@@ -243,12 +259,14 @@ export class StateStore {
 
   deleteLink(linkId) {
     if (!linkId) return;
-    const target = this.links.find(l => l._id === linkId);
+    const target = this.links.find((l) => l._id === linkId);
     if (!target) return;
 
-    this.links = this.links.filter(l => l._id !== linkId);
+    this.links = this.links.filter((l) => l._id !== linkId);
     const sameGroup = this.getLinksForGroup(target.parent);
-    sameGroup.forEach((item, idx) => { item.order = idx; });
+    sameGroup.forEach((item, idx) => {
+      item.order = idx;
+    });
     this.saveData();
     this.onRender();
   }
@@ -265,9 +283,13 @@ export class StateStore {
     }
 
     this.profiles = Object.assign({}, this.profiles, imported.profiles || {});
-    const activeProfile = normalizeProfile(this.profiles[this.profileId], imported.groups || this.groups, this.settings);
+    const activeProfile = normalizeProfile(
+      this.profiles[this.profileId],
+      imported.groups || this.groups,
+      this.settings
+    );
     this.profiles[this.profileId] = activeProfile;
-    this.groups.pinned = activeProfile.pinned;
+    this.groups.pinned = [...activeProfile.pinned];
     this.groups.selected = activeProfile.selected;
     this.settings = activeProfile.settings;
     this.selectedGroup = this.groups.selected;

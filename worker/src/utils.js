@@ -67,7 +67,7 @@ export function getLocalDateParts(date, timeZone) {
     hour: '2-digit',
     hour12: false
   }).formatToParts(date);
-  const value = name => parts.find(part => part.type === name)?.value || '';
+  const value = (name) => parts.find((part) => part.type === name)?.value || '';
   const hour = Number(value('hour')) % 24;
 
   return {

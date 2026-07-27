@@ -21,7 +21,9 @@ This project is built using native HTML, CSS, and modern Javascript (ES Modules)
 ## Getting Started
 
 ### 1. Load the Extension in Chrome
+
 To run the Extension locally:
+
 1. Open Google Chrome and navigate to `chrome://extensions/`.
 2. Enable **Developer mode** (toggle in the top-right corner).
 3. Click **Load unpacked** in the top-left corner.
@@ -30,6 +32,7 @@ To run the Extension locally:
 The custom new tab page is now active. Open a new tab to see it!
 
 ### 2. Set Up Cloud Sync (Cloudflare Worker)
+
 To enable syncing across multiple devices, deploy the Cloudflare Worker in the `worker/` folder:
 
 1. Navigate to the worker directory and install dependencies:
@@ -88,6 +91,7 @@ To enable syncing across multiple devices, deploy the Cloudflare Worker in the `
 The project includes unit tests for both the extension controllers/utilities and the worker R2 synchronizer using the native Node.js test runner. No external dependencies are needed.
 
 To run the unit tests:
+
 ```bash
 node --test tests/*.test.mjs
 ```
@@ -95,6 +99,7 @@ node --test tests/*.test.mjs
 ---
 
 ## Development & Refactoring Rules
+
 - **CSS Splits**: Stylesheets are modularized:
   - `index.css`: Grid, links, tabs, and base structure.
   - `modal.css`: Styling for creation and deletion modal dialogs.

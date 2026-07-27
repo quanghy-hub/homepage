@@ -18,12 +18,9 @@ import { StateStore } from './state.js';
 
   /* ========== DOM REFS ========== */
   const dom = getDomRefs();
-  const {
-    addCurrentBtn,
-    quickActionStatus,
-    syncProfileSelect
-  } = dom;
-  const IS_TOUCH_DEVICE = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  const { addCurrentBtn, quickActionStatus, syncProfileSelect } = dom;
+  const IS_TOUCH_DEVICE =
+    window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 
   /* ========== BIND STATE CALLBACKS ========== */
   store.onRender = render;
@@ -51,7 +48,7 @@ import { StateStore } from './state.js';
     dom,
     getFaviconCache: () => store.faviconCache,
     getGroups: () => store.groups,
-    getLinksForGroup: groupName => store.getLinksForGroup(groupName),
+    getLinksForGroup: (groupName) => store.getLinksForGroup(groupName),
     getSelectedGroup: () => store.selectedGroup,
     getSettings: () => store.settings,
     isEditMode: () => store.isEditMode,
@@ -105,23 +102,23 @@ import { StateStore } from './state.js';
 
   const modalController = createModalController({
     dom,
-    deleteGroup: groupName => store.deleteGroup(groupName),
-    deleteLink: linkId => store.deleteLink(linkId),
+    deleteGroup: (groupName) => store.deleteGroup(groupName),
+    deleteLink: (linkId) => store.deleteLink(linkId),
     getGroups: () => store.groups,
     getLinks: () => store.links,
-    getLinksForGroup: groupName => store.getLinksForGroup(groupName),
+    getLinksForGroup: (groupName) => store.getLinksForGroup(groupName),
     getSelectedGroup: () => store.selectedGroup,
     normalizeGroupOrders: (...groupNames) => store.normalizeGroupOrders(...groupNames),
     renameGroupInProfiles: (oldName, newName) => store.renameGroupInProfiles(oldName, newName),
     render,
-    saveData: options => store.saveData(options),
-    setSelectedGroup: groupName => store.setSelectedGroup(groupName),
-    togglePinGroup: groupName => store.togglePinGroup(groupName)
+    saveData: (options) => store.saveData(options),
+    setSelectedGroup: (groupName) => store.setSelectedGroup(groupName),
+    togglePinGroup: (groupName) => store.togglePinGroup(groupName)
   });
 
   function openLinkEditor(linkId) {
     if (!linkId) return;
-    const link = store.links.find(item => item._id === linkId);
+    const link = store.links.find((item) => item._id === linkId);
     if (link) modalController.openModal('edit-link', link);
   }
 
@@ -131,7 +128,7 @@ import { StateStore } from './state.js';
   }
 
   function bindGridInteractions() {
-    document.addEventListener('click', e => {
+    document.addEventListener('click', (e) => {
       const deleteBadge = e.target.closest('.link-edit-badge');
       if (deleteBadge && store.isEditMode) {
         e.preventDefault();
@@ -171,9 +168,11 @@ import { StateStore } from './state.js';
       }
     });
 
-    document.addEventListener('contextmenu', e => {
+    document.addEventListener('contextmenu', (e) => {
       if (!store.isEditMode) return;
-      const draggableTarget = e.target.closest('.link-item, .pinned-group-header, #group-tabs .tab:not(.tab-add-group)');
+      const draggableTarget = e.target.closest(
+        '.link-item, .pinned-group-header, #group-tabs .tab:not(.tab-add-group)'
+      );
       if (draggableTarget && IS_TOUCH_DEVICE) {
         e.preventDefault();
         return;
@@ -187,34 +186,48 @@ import { StateStore } from './state.js';
   }
 
   addCurrentBtn.addEventListener('click', () => {
-    chrome.storage.local.get([STORAGE_KEYS.recentPage], result => {
+    chrome.storage.local.get([STORAGE_KEYS.recentPage], (result) => {
       const recent = result[STORAGE_KEYS.recentPage];
       if (!recent || !isHttpUrl(recent.url)) {
-        setQuickActionStatus('No recent page to add. Please open a website first, then return.', 'err');
+        setQuickActionStatus(
+          'No recent page to add. Please open a website first, then return.',
+          'err'
+        );
         modalController.fillAddLinkModal('', '', store.selectedGroup);
         return;
       }
 
       setQuickActionStatus(`Retrieved: ${recent.title || recent.url}`, 'ok');
-      modalController.fillAddLinkModal(recent.url, recent.title || autoTitle(recent.url), store.selectedGroup);
+      modalController.fillAddLinkModal(
+        recent.url,
+        recent.title || autoTitle(recent.url),
+        store.selectedGroup
+      );
     });
   });
 
   const syncController = createSyncController({
-    applyImportedState: imported => store.applyImportedState(imported),
+    applyImportedState: (imported) => store.applyImportedState(imported),
     dom,
     getRevision: () => store.syncRevision,
-    getState: () => ({ links: store.links, groups: store.groups, settings: store.settings, profileId: store.profileId }),
+    getState: () => ({
+      links: store.links,
+      groups: store.groups,
+      settings: store.settings,
+      profileId: store.profileId
+    }),
     persistCurrentProfile: () => store.persistCurrentProfile(),
     refreshSettingsControls,
     render,
-    saveData: options => store.saveData(options),
-    setRevision: revision => { store.syncRevision = revision; },
-    switchProfile: nextProfileId => store.switchProfile(nextProfileId)
+    saveData: (options) => store.saveData(options),
+    setRevision: (revision) => {
+      store.syncRevision = revision;
+    },
+    switchProfile: (nextProfileId) => store.switchProfile(nextProfileId)
   });
 
   /* ========== KEYBOARD ========== */
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       modalController.closeModal();
       settingsController.close();
@@ -225,7 +238,14 @@ import { StateStore } from './state.js';
   /* ========== AUTO-REFRESH ON EXTERNAL CHANGES ========== */
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && store.suppressStorageSync) return;
-    if (area === 'local' && (changes.links || changes.groups || changes.settings || changes.profiles || changes.syncProfile)) {
+    if (
+      area === 'local' &&
+      (changes.links ||
+        changes.groups ||
+        changes.settings ||
+        changes.profiles ||
+        changes.syncProfile)
+    ) {
       let shouldApplyActiveProfile = false;
       if (changes.links) store.links = changes.links.newValue || [];
       if (changes.groups) {
@@ -255,20 +275,22 @@ import { StateStore } from './state.js';
   bindGridInteractions();
   bindDragDrop({
     getLinks: () => store.links,
-    getLinksForGroup: groupName => store.getLinksForGroup(groupName),
+    getLinksForGroup: (groupName) => store.getLinksForGroup(groupName),
     isEditMode: () => store.isEditMode,
     normalizeGroupOrders: (...groupNames) => store.normalizeGroupOrders(...groupNames),
     render,
-    reorderLink: (draggedId, targetId, targetGroup) => store.reorderLink(draggedId, targetId, targetGroup),
+    reorderLink: (draggedId, targetId, targetGroup) =>
+      store.reorderLink(draggedId, targetId, targetGroup),
     reorderGroup: (draggedName, targetName) => store.reorderGroup(draggedName, targetName),
-    reorderPinnedGroup: (draggedName, targetName) => store.reorderPinnedGroup(draggedName, targetName),
-    saveData: options => store.saveData(options)
+    reorderPinnedGroup: (draggedName, targetName) =>
+      store.reorderPinnedGroup(draggedName, targetName),
+    saveData: (options) => store.saveData(options)
   });
   bindEditModeActivation({
     enterEditMode,
     exitEditMode,
     isEditMode: () => store.isEditMode,
-    isTouchDevice: IS_TOUCH_DEVICE,
+    isTouchDevice: IS_TOUCH_DEVICE
   });
   setEditMode(false);
   Promise.all([
@@ -287,5 +309,4 @@ import { StateStore } from './state.js';
     syncController.bootstrapCloud({ force: true }).catch(() => {});
     syncController.startAutoRestore();
   });
-
 })();

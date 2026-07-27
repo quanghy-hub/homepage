@@ -1,0 +1,44 @@
+{
+  "name": "home",
+  "version": "1.0.0",
+  "description": "A clean, highly customizable new tab page designed to organize your favorite web links. Easily group your quicklinks into custom categories, pin important groups for quick access, and keep your workspace clean and organized.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "lint": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\"",
+    "lint:fix": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\" --fix",
+    "format": "prettier --write .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,html,json,md}": "prettier --write"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quanghy-hub/homepage.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/quanghy-hub/homepage/issues"
+  },
+  "homepage": "https://github.com/quanghy-hub/homepage#readme",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.8.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.2.0",
+    "prettier": "^3.9.6"
+  }
+}

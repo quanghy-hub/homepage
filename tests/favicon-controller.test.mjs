@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  createFaviconController,
-  FAVICON_CACHE_TTL
-} from '../src/newtab/favicon-controller.js';
+import { createFaviconController, FAVICON_CACHE_TTL } from '../src/newtab/favicon-controller.js';
 import {
   FAVICON_SOURCES,
   getDefaultFaviconUrl,
@@ -22,8 +19,12 @@ test('uses a fresh local favicon cache for 14 days without fetching', () => {
   };
   const controller = createFaviconController({
     getFaviconCache: () => cache,
-    persistFaviconCache: () => { throw new Error('fresh cache must not be rewritten'); },
-    queueIdleTask: () => { throw new Error('fresh cache must not fetch'); }
+    persistFaviconCache: () => {
+      throw new Error('fresh cache must not be rewritten');
+    },
+    queueIdleTask: () => {
+      throw new Error('fresh cache must not fetch');
+    }
   });
   const img = { dataset: {} };
 
@@ -52,12 +53,20 @@ test('shows a useful letter while image sources are unavailable', () => {
     const controller = createFaviconController({
       getFaviconCache: () => ({}),
       persistFaviconCache: () => {},
-      queueIdleTask: task => { idleTask = task; }
+      queueIdleTask: (task) => {
+        idleTask = task;
+      }
     });
     const iconWrap = { appendChild() {}, textContent: '' };
 
     controller.attach({
-      element: { classList: { add: value => { fallbackClass = value; } } },
+      element: {
+        classList: {
+          add: (value) => {
+            fallbackClass = value;
+          }
+        }
+      },
       iconWrap,
       img: { dataset: {}, style: {} },
       link: { title, url: 'https://example.com/' }
@@ -78,22 +87,27 @@ test('replaces the letter fallback immediately after a successful fetch', async 
     runtime: {
       id: 'extension-id',
       lastError: null,
-      sendMessage: (_message, callback) => callback({
-        dataUrl: 'data:image/png;base64,aWNvbg==',
-        ok: true,
-        sourceUrl: getDefaultFaviconUrl('https://example.com/')
-      })
+      sendMessage: (_message, callback) =>
+        callback({
+          dataUrl: 'data:image/png;base64,aWNvbg==',
+          ok: true,
+          sourceUrl: getDefaultFaviconUrl('https://example.com/')
+        })
     }
   };
   globalThis.document = { querySelectorAll: () => [] };
   const controller = createFaviconController({
     getFaviconCache: () => cache,
     persistFaviconCache: () => {},
-    queueIdleTask: task => { idleTask = task; }
+    queueIdleTask: (task) => {
+      idleTask = task;
+    }
   });
   const img = { dataset: {}, isConnected: false, style: {} };
   const iconWrap = {
-    appendChild: node => { appendedNode = node; },
+    appendChild: (node) => {
+      appendedNode = node;
+    },
     textContent: ''
   };
 
@@ -101,7 +115,9 @@ test('replaces the letter fallback immediately after a successful fetch', async 
     element: {
       classList: {
         add() {},
-        remove: value => { removedClass = value; }
+        remove: (value) => {
+          removedClass = value;
+        }
       }
     },
     iconWrap,
@@ -149,8 +165,12 @@ test('refreshes an expired Google cache with Google candidates', async () => {
   globalThis.document = { querySelectorAll: () => [] };
   const controller = createFaviconController({
     getFaviconCache: () => cache,
-    persistFaviconCache: () => { persisted = true; },
-    queueIdleTask: task => { idleTask = task; }
+    persistFaviconCache: () => {
+      persisted = true;
+    },
+    queueIdleTask: (task) => {
+      idleTask = task;
+    }
   });
 
   controller.attach({
@@ -173,9 +193,15 @@ test('handles Chrome source directly without fetching or caching', () => {
   globalThis.chrome = { runtime: { id: 'extension-id' } };
   let idleTaskScheduled = false;
   const controller = createFaviconController({
-    getFaviconCache: () => { throw new Error('Chrome source must not check cache'); },
-    persistFaviconCache: () => { throw new Error('Chrome source must not persist cache'); },
-    queueIdleTask: () => { idleTaskScheduled = true; }
+    getFaviconCache: () => {
+      throw new Error('Chrome source must not check cache');
+    },
+    persistFaviconCache: () => {
+      throw new Error('Chrome source must not persist cache');
+    },
+    queueIdleTask: () => {
+      idleTaskScheduled = true;
+    }
   });
   const img = { dataset: {} };
   let appendedImg = null;
@@ -183,7 +209,9 @@ test('handles Chrome source directly without fetching or caching', () => {
   controller.attach({
     element: { classList: { add() {} } },
     iconWrap: {
-      appendChild: node => { appendedImg = node; },
+      appendChild: (node) => {
+        appendedImg = node;
+      },
       textContent: ''
     },
     img,
@@ -194,7 +222,10 @@ test('handles Chrome source directly without fetching or caching', () => {
     }
   });
 
-  assert.equal(img.src, 'chrome-extension://extension-id/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F&size=1024');
+  assert.equal(
+    img.src,
+    'chrome-extension://extension-id/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F&size=1024'
+  );
   assert.equal(appendedImg, img);
   assert.equal(idleTaskScheduled, false);
   delete globalThis.chrome;

@@ -12,7 +12,7 @@ export function bindDragDrop({
   let touchDrag = null;
 
   function clearDragOver() {
-    document.querySelectorAll('.drag-over').forEach(node => node.classList.remove('drag-over'));
+    document.querySelectorAll('.drag-over').forEach((node) => node.classList.remove('drag-over'));
   }
 
   function getTouchDropTarget(touch) {
@@ -67,7 +67,11 @@ export function bindDragDrop({
 
     if (touchDrag.type === 'group') {
       const tab = target.closest('#group-tabs .tab');
-      if (tab && !tab.classList.contains('tab-add-group') && tab.dataset.groupName !== touchDrag.id) {
+      if (
+        tab &&
+        !tab.classList.contains('tab-add-group') &&
+        tab.dataset.groupName !== touchDrag.id
+      ) {
         tab.classList.add('drag-over');
       }
       return;
@@ -92,7 +96,11 @@ export function bindDragDrop({
 
     if (touchDrag.type === 'group') {
       const tab = target.closest('#group-tabs .tab');
-      if (tab && !tab.classList.contains('tab-add-group') && tab.dataset.groupName !== touchDrag.id) {
+      if (
+        tab &&
+        !tab.classList.contains('tab-add-group') &&
+        tab.dataset.groupName !== touchDrag.id
+      ) {
         reorderGroup(touchDrag.id, tab.dataset.groupName);
       }
       return;
@@ -109,12 +117,12 @@ export function bindDragDrop({
     const grid = target.closest('.links-grid[data-group]');
     if (!grid) return;
 
-    const dragged = getLinks().find(link => link._id === touchDrag.id);
+    const dragged = getLinks().find((link) => link._id === touchDrag.id);
     if (!dragged) return;
 
     const sourceGroup = dragged.parent;
     const targetGroup = grid.dataset.group;
-    const targetLinks = getLinksForGroup(targetGroup).filter(link => link._id !== touchDrag.id);
+    const targetLinks = getLinksForGroup(targetGroup).filter((link) => link._id !== touchDrag.id);
     dragged.parent = targetGroup;
     dragged.order = targetLinks.length;
     normalizeGroupOrders(sourceGroup, targetGroup);
@@ -122,68 +130,87 @@ export function bindDragDrop({
     render();
   }
 
-  document.addEventListener('touchstart', e => {
-    if (!isEditMode() || e.touches.length !== 1) return;
+  document.addEventListener(
+    'touchstart',
+    (e) => {
+      if (!isEditMode() || e.touches.length !== 1) return;
 
-    const candidate = getTouchDragCandidate(e.target);
-    if (!candidate) return;
+      const candidate = getTouchDragCandidate(e.target);
+      if (!candidate) return;
 
-    const touch = e.touches[0];
-    touchDrag = {
-      ...candidate,
-      active: false,
-      startX: touch.clientX,
-      startY: touch.clientY,
-      lastX: touch.clientX,
-      lastY: touch.clientY
-    };
-  }, { passive: true });
+      const touch = e.touches[0];
+      touchDrag = {
+        ...candidate,
+        active: false,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        lastX: touch.clientX,
+        lastY: touch.clientY
+      };
+    },
+    { passive: true }
+  );
 
-  document.addEventListener('touchmove', e => {
-    if (!touchDrag || e.touches.length !== 1) return;
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (!touchDrag || e.touches.length !== 1) return;
 
-    const touch = e.touches[0];
-    touchDrag.lastX = touch.clientX;
-    touchDrag.lastY = touch.clientY;
+      const touch = e.touches[0];
+      touchDrag.lastX = touch.clientX;
+      touchDrag.lastY = touch.clientY;
 
-    const dx = Math.abs(touch.clientX - touchDrag.startX);
-    const dy = Math.abs(touch.clientY - touchDrag.startY);
-    if (!touchDrag.active && dx < 8 && dy < 8) return;
+      const dx = Math.abs(touch.clientX - touchDrag.startX);
+      const dy = Math.abs(touch.clientY - touchDrag.startY);
+      if (!touchDrag.active && dx < 8 && dy < 8) return;
 
-    if (!touchDrag.active) {
-      touchDrag.active = true;
-      touchDrag.el.classList.add(touchDrag.startClass);
-    }
+      if (!touchDrag.active) {
+        touchDrag.active = true;
+        touchDrag.el.classList.add(touchDrag.startClass);
+      }
 
-    e.preventDefault();
-    markTouchDragOver(getTouchDropTarget(touch));
-  }, { passive: false });
-
-  document.addEventListener('touchend', e => {
-    if (!touchDrag) return;
-
-    const dropTouch = e.changedTouches[0] || { clientX: touchDrag.lastX, clientY: touchDrag.lastY };
-    const dropTarget = getTouchDropTarget(dropTouch);
-    const wasActive = touchDrag.active;
-
-    if (wasActive) {
       e.preventDefault();
-      finishTouchDrag(dropTarget);
-    }
+      markTouchDragOver(getTouchDropTarget(touch));
+    },
+    { passive: false }
+  );
 
-    touchDrag.el.classList.remove(touchDrag.startClass);
-    clearDragOver();
-    touchDrag = null;
-  }, { passive: false });
+  document.addEventListener(
+    'touchend',
+    (e) => {
+      if (!touchDrag) return;
 
-  document.addEventListener('touchcancel', () => {
-    if (!touchDrag) return;
-    touchDrag.el.classList.remove(touchDrag.startClass);
-    clearDragOver();
-    touchDrag = null;
-  }, { passive: true });
+      const dropTouch = e.changedTouches[0] || {
+        clientX: touchDrag.lastX,
+        clientY: touchDrag.lastY
+      };
+      const dropTarget = getTouchDropTarget(dropTouch);
+      const wasActive = touchDrag.active;
 
-  document.addEventListener('dragstart', e => {
+      if (wasActive) {
+        e.preventDefault();
+        finishTouchDrag(dropTarget);
+      }
+
+      touchDrag.el.classList.remove(touchDrag.startClass);
+      clearDragOver();
+      touchDrag = null;
+    },
+    { passive: false }
+  );
+
+  document.addEventListener(
+    'touchcancel',
+    () => {
+      if (!touchDrag) return;
+      touchDrag.el.classList.remove(touchDrag.startClass);
+      clearDragOver();
+      touchDrag = null;
+    },
+    { passive: true }
+  );
+
+  document.addEventListener('dragstart', (e) => {
     if (!isEditMode()) {
       e.preventDefault();
       return;
@@ -216,7 +243,7 @@ export function bindDragDrop({
     e.dataTransfer.setData('application/group', item.dataset.parent);
   });
 
-  document.addEventListener('dragend', e => {
+  document.addEventListener('dragend', (e) => {
     const header = e.target.closest('.pinned-group-header');
     if (header) {
       header.classList.remove('dragging-group-header');
@@ -230,7 +257,7 @@ export function bindDragDrop({
     clearDragOver();
   });
 
-  document.addEventListener('dragover', e => {
+  document.addEventListener('dragover', (e) => {
     if (!isEditMode()) return;
 
     // Check if dragging pinned group header
@@ -283,7 +310,7 @@ export function bindDragDrop({
     }
   });
 
-  document.addEventListener('dragleave', e => {
+  document.addEventListener('dragleave', (e) => {
     const header = e.target.closest('.pinned-group-header');
     if (header) {
       header.classList.remove('drag-over');
@@ -298,7 +325,7 @@ export function bindDragDrop({
     item?.classList.remove('drag-over');
   });
 
-  document.addEventListener('drop', e => {
+  document.addEventListener('drop', (e) => {
     if (!isEditMode()) return;
 
     // Handle dropped pinned group header
@@ -347,11 +374,11 @@ export function bindDragDrop({
     }
 
     if (grid && e.target === grid && grid.dataset.group) {
-      const dragged = getLinks().find(l => l._id === draggedId);
+      const dragged = getLinks().find((l) => l._id === draggedId);
       if (!dragged) return;
       const sourceGroup = dragged.parent;
       const targetGroup = grid.dataset.group;
-      const targetLinks = getLinksForGroup(targetGroup).filter(l => l._id !== draggedId);
+      const targetLinks = getLinksForGroup(targetGroup).filter((l) => l._id !== draggedId);
       dragged.parent = targetGroup;
       dragged.order = targetLinks.length;
       normalizeGroupOrders(sourceGroup, targetGroup);

@@ -18,7 +18,10 @@ test('builds candidate set for Google favicon source', () => {
     googleCandidates[0],
     'https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fexample.com%2Fpath&sz=256'
   );
-  assert.equal(googleCandidates.some(url => url.startsWith('chrome-extension://')), false);
+  assert.equal(
+    googleCandidates.some((url) => url.startsWith('chrome-extension://')),
+    false
+  );
 });
 
 test('fills missing favicon URLs with the default 256px source', () => {
@@ -33,13 +36,15 @@ test('keeps Google favicon URLs in the shared synchronized links payload', () =>
   const faviconUrl = getDefaultFaviconUrl('https://example.com/');
   const state = {
     groups: { list: ['A'], pinned: ['A'], selected: 'A' },
-    links: [{
-      _id: 'one',
-      faviconSource: FAVICON_SOURCES.google,
-      faviconUrl,
-      parent: 'A',
-      url: 'https://example.com/'
-    }],
+    links: [
+      {
+        _id: 'one',
+        faviconSource: FAVICON_SOURCES.google,
+        faviconUrl,
+        parent: 'A',
+        url: 'https://example.com/'
+      }
+    ],
     profileId: 'mobile',
     settings: { iconSize: 52 }
   };
@@ -70,16 +75,21 @@ test('drops invalid synchronized links during normalization', () => {
     null
   ]);
 
-  assert.deepEqual(links.map(link => link._id), ['safe']);
+  assert.deepEqual(
+    links.map((link) => link._id),
+    ['safe']
+  );
 });
 
 test('preserves a selected Chrome favicon source during normalization', () => {
   globalThis.chrome = { runtime: { id: 'extension-id' } };
-  const [link] = normalizeLinks([{
-    _id: 'chrome',
-    faviconSource: FAVICON_SOURCES.chrome,
-    url: 'https://example.com/'
-  }]);
+  const [link] = normalizeLinks([
+    {
+      _id: 'chrome',
+      faviconSource: FAVICON_SOURCES.chrome,
+      url: 'https://example.com/'
+    }
+  ]);
 
   assert.equal(link.faviconSource, FAVICON_SOURCES.chrome);
   assert.match(link.faviconUrl, /^chrome-extension:\/\/extension-id\/_favicon\//);
@@ -87,12 +97,14 @@ test('preserves a selected Chrome favicon source during normalization', () => {
 });
 
 test('migrates a removed favicon source back to Google', () => {
-  const [link] = normalizeLinks([{
-    _id: 'legacy',
-    faviconSource: 'removed-provider',
-    faviconUrl: 'https://stale.example/logo.png',
-    url: 'https://example.com/'
-  }]);
+  const [link] = normalizeLinks([
+    {
+      _id: 'legacy',
+      faviconSource: 'removed-provider',
+      faviconUrl: 'https://stale.example/logo.png',
+      url: 'https://example.com/'
+    }
+  ]);
 
   assert.equal(link.faviconSource, FAVICON_SOURCES.google);
   assert.equal(link.faviconUrl, getDefaultFaviconUrl(link.url));
@@ -109,15 +121,21 @@ test('loadFaviconPreview resolves Chrome source directly without messaging', asy
   globalThis.chrome = { runtime: { id: 'extension-id' } };
 
   const pageUrl = 'https://example.com/';
-  const result = await loadFaviconPreview({
-    pageUrl,
-    source: FAVICON_SOURCES.chrome
-  }, {
-    requestDataUrl: () => {
-      throw new Error('Should not request data URL for chrome source');
+  const result = await loadFaviconPreview(
+    {
+      pageUrl,
+      source: FAVICON_SOURCES.chrome
+    },
+    {
+      requestDataUrl: () => {
+        throw new Error('Should not request data URL for chrome source');
+      }
     }
-  });
+  );
 
-  assert.equal(result, 'chrome-extension://extension-id/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F&size=1024');
+  assert.equal(
+    result,
+    'chrome-extension://extension-id/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F&size=1024'
+  );
   delete globalThis.chrome;
 });

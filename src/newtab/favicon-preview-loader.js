@@ -7,10 +7,14 @@ import {
 
 function requestFaviconDataUrl(urls) {
   if (!urls.length) return Promise.resolve('');
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     try {
-      chrome.runtime.sendMessage({ type: 'fetch-favicon', urls }, response => {
-        if (chrome.runtime.lastError || !response?.ok || !response.dataUrl?.startsWith('data:image/')) {
+      chrome.runtime.sendMessage({ type: 'fetch-favicon', urls }, (response) => {
+        if (
+          chrome.runtime.lastError ||
+          !response?.ok ||
+          !response.dataUrl?.startsWith('data:image/')
+        ) {
           resolve('');
           return;
         }
@@ -22,7 +26,10 @@ function requestFaviconDataUrl(urls) {
   });
 }
 
-export function loadFaviconPreview({ pageUrl, source }, { requestDataUrl = requestFaviconDataUrl } = {}) {
+export function loadFaviconPreview(
+  { pageUrl, source },
+  { requestDataUrl = requestFaviconDataUrl } = {}
+) {
   const selectedSource = normalizeFaviconSource(source);
   if (selectedSource === FAVICON_SOURCES.chrome) {
     return Promise.resolve(getFaviconUrl(pageUrl, selectedSource));

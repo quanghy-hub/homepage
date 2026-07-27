@@ -5,11 +5,11 @@ export const DEFAULT_BACKUP_A_HOUR = 1;
 export const DEFAULT_BACKUP_A_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 export const APP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
-export function normalizeBackupAHour(value) {
+export function normalizeBackupAHour(_value) {
   return DEFAULT_BACKUP_A_HOUR;
 }
 
-export function normalizeTimeZone(value) {
+export function normalizeTimeZone(_value) {
   return DEFAULT_BACKUP_A_TIME_ZONE;
 }
 
@@ -46,12 +46,20 @@ export function normalizeProfile(value, fallbackGroups = {}) {
   if (Object.prototype.hasOwnProperty.call(profile, 'settings')) {
     normalized.settings = asObject(profile.settings);
   }
-  if (Object.prototype.hasOwnProperty.call(profile, 'pinned') || asArray(fallbackGroups.pinned).length) {
-    const rawPinned = asArray(profile.pinned).length ? asArray(profile.pinned) : asArray(fallbackGroups.pinned);
-    normalized.pinned = groupList.length ? rawPinned.filter(name => groupList.includes(name)) : rawPinned;
+  if (
+    Object.prototype.hasOwnProperty.call(profile, 'pinned') ||
+    asArray(fallbackGroups.pinned).length
+  ) {
+    const rawPinned = asArray(profile.pinned).length
+      ? asArray(profile.pinned)
+      : asArray(fallbackGroups.pinned);
+    normalized.pinned = groupList.length
+      ? rawPinned.filter((name) => groupList.includes(name))
+      : rawPinned;
   }
   if (typeof profile.selected === 'string' || typeof fallbackGroups.selected === 'string') {
-    const selected = typeof profile.selected === 'string' ? profile.selected : fallbackGroups.selected;
+    const selected =
+      typeof profile.selected === 'string' ? profile.selected : fallbackGroups.selected;
     normalized.selected = groupList.length && !groupList.includes(selected) ? '' : selected;
   }
 

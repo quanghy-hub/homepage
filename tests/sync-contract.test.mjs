@@ -46,7 +46,7 @@ test('worker rejects writes based on a stale revision', async () => {
 
   await assert.rejects(
     writeState(bucket, 'homepage', { baseRevision: 0, groups: { list: [] } }),
-    error => error.message === 'Revision conflict' && error.status === 409
+    (error) => error.message === 'Revision conflict' && error.status === 409
   );
 });
 
@@ -54,6 +54,12 @@ test('normalizeWorkerUrl formats URL correctly with https protocol', () => {
   assert.equal(normalizeWorkerUrl(''), '');
   assert.equal(normalizeWorkerUrl('  my-worker.workers.dev/  '), 'https://my-worker.workers.dev');
   assert.equal(normalizeWorkerUrl('http://localhost:8787/'), 'http://localhost:8787');
-  assert.equal(getStateEndpoint('my-worker.workers.dev'), 'https://my-worker.workers.dev/sync/homepage/state');
-  assert.equal(getBackupEndpoint('my-worker.workers.dev', 'a'), 'https://my-worker.workers.dev/sync/homepage/backup/a');
+  assert.equal(
+    getStateEndpoint('my-worker.workers.dev'),
+    'https://my-worker.workers.dev/sync/homepage/state'
+  );
+  assert.equal(
+    getBackupEndpoint('my-worker.workers.dev', 'a'),
+    'https://my-worker.workers.dev/sync/homepage/backup/a'
+  );
 });

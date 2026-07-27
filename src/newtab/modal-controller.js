@@ -80,7 +80,7 @@ export function createModalController({
       modalBodyGroup.classList.add('hidden');
 
       inputGroup.innerHTML = '';
-      groups.list.forEach(groupName => {
+      groups.list.forEach((groupName) => {
         const opt = document.createElement('option');
         opt.value = groupName;
         opt.textContent = groupName;
@@ -133,9 +133,13 @@ export function createModalController({
     if (groups.list.includes(name) && name !== editingGroupName) return;
 
     if (modalMode === 'edit-group' && editingGroupName) {
-      groups.list = groups.list.map(groupName => groupName === editingGroupName ? name : groupName);
-      groups.pinned = groups.pinned.map(groupName => groupName === editingGroupName ? name : groupName);
-      links.forEach(link => {
+      groups.list = groups.list.map((groupName) =>
+        groupName === editingGroupName ? name : groupName
+      );
+      groups.pinned = groups.pinned.map((groupName) =>
+        groupName === editingGroupName ? name : groupName
+      );
+      links.forEach((link) => {
         if (link.parent === editingGroupName) link.parent = name;
       });
       if (getSelectedGroup() === editingGroupName) setSelectedGroup(name);
@@ -166,7 +170,7 @@ export function createModalController({
     const group = inputGroup.value;
     const faviconSource = faviconPicker.getSelected();
     if (editingLinkId) {
-      const link = links.find(item => item._id === editingLinkId);
+      const link = links.find((item) => item._id === editingLinkId);
       if (link) {
         const previousGroup = link.parent;
         link.url = url;
@@ -216,7 +220,7 @@ export function createModalController({
       deleteGroup(groupName);
     }
   });
-  modalOverlay.addEventListener('click', e => {
+  modalOverlay.addEventListener('click', (e) => {
     if (e.target === modalOverlay) closeModal();
   });
 
@@ -229,8 +233,8 @@ export function createModalController({
     saveLink();
   });
 
-  [inputUrl, inputName, inputGroupName, inputGroup].forEach(el => {
-    el.addEventListener('keydown', e => {
+  [inputUrl, inputName, inputGroupName, inputGroup].forEach((el) => {
+    el.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key !== 'Enter' || e.isComposing) return;
       e.preventDefault();

@@ -7,11 +7,7 @@
   "chrome_url_overrides": {
     "newtab": "src/newtab/index.html"
   },
-  "permissions": [
-    "storage",
-    "tabs",
-    "favicon"
-  ],
+  "permissions": ["storage", "tabs", "favicon"],
   "host_permissions": [
     "https://www.google.com/*",
     "https://*.gstatic.com/*",

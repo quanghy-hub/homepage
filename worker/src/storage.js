@@ -21,7 +21,9 @@ export async function readState(bucket, appId) {
   if (!object) return normalizeStoredState(null, appId);
 
   try {
-    return normalizeStoredState(await object.json(), appId);
+    const state = normalizeStoredState(await object.json(), appId);
+    state._etag = object.etag;
+    return state;
   } catch {
     return normalizeStoredState(null, appId);
   }
@@ -38,16 +40,17 @@ export async function readBackup(bucket, appId, slot) {
   }
 }
 
-export async function writeObject(bucket, key, state) {
+export async function writeObject(bucket, key, state, options = {}) {
   await bucket.put(key, JSON.stringify(state, null, 2), {
     httpMetadata: {
       contentType: 'application/json; charset=utf-8'
-    }
+    },
+    ...options
   });
 }
 
 export async function writeBackup(bucket, appId, slot, sourceState = null, now = new Date()) {
-  const current = sourceState || await readState(bucket, appId);
+  const current = sourceState || (await readState(bucket, appId));
   if (!current || current.revision <= 0) {
     const err = new Error('State not found');
     err.status = 404;
@@ -88,10 +91,7 @@ export async function writeState(bucket, appId, incoming) {
     throw new Error('Invalid profileId');
   }
 
-  if (
-    Number.isSafeInteger(payload.baseRevision) &&
-    payload.baseRevision !== existing.revision
-  ) {
+  if (Number.isSafeInteger(payload.baseRevision) && payload.baseRevision !== existing.revision) {
     const err = new Error('Revision conflict');
     err.status = 409;
     throw err;
@@ -100,7 +100,9 @@ export async function writeState(bucket, appId, incoming) {
   const next = {
     version: STATE_VERSION,
     appId,
-    links: Object.prototype.hasOwnProperty.call(payload, 'links') ? asArray(payload.links) : existing.links,
+    links: Object.prototype.hasOwnProperty.call(payload, 'links')
+      ? asArray(payload.links)
+      : existing.links,
     groups: Object.prototype.hasOwnProperty.call(payload, 'groups')
       ? {
           list: asArray(groups.list),
@@ -125,7 +127,20 @@ export async function writeState(bucket, appId, incoming) {
     });
   }
 
-  await writeObject(bucket, getStateKey(appId), next);
+  const options = existing._etag ? { onlyIf: { etagMatches: existing._etag } } : {};
+  delete next._etag;
+
+  try {
+    await writeObject(bucket, getStateKey(appId), next, options);
+  } catch (err) {
+    if (err.message && err.message.includes('Precondition Failed')) {
+      const conflict = new Error('Revision conflict (ETag mismatch)');
+      conflict.status = 409;
+      throw conflict;
+    }
+    throw err;
+  }
+
   await writeBackup(bucket, appId, 'b', next);
   await maybeRunScheduledBackupA(bucket, appId, next);
 
@@ -137,7 +152,7 @@ export async function listAppIds(bucket) {
   let cursor;
   do {
     const listed = await bucket.list({ prefix: 'apps/', cursor });
-    asArray(listed.objects).forEach(object => {
+    asArray(listed.objects).forEach((object) => {
       const match = object.key.match(/^apps\/([^/]+)\/state\.v1\.json$/);
       if (match && APP_ID_PATTERN.test(match[1])) ids.add(match[1]);
     });

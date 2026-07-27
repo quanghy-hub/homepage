@@ -7,11 +7,7 @@ import {
   mergeLocalAddsIntoRemote,
   normalizeWorkerUrl
 } from '../src/newtab/sync-api.js';
-import {
-  normalizeLinks,
-  normalizeProfile,
-  normalizeSettings
-} from '../src/newtab/storage.js';
+import { normalizeLinks, normalizeProfile, normalizeSettings } from '../src/newtab/storage.js';
 import { createSyncController } from '../src/newtab/sync-controller.js';
 
 test('normalizeWorkerUrl handles various edge cases correctly', () => {
@@ -20,7 +16,10 @@ test('normalizeWorkerUrl handles various edge cases correctly', () => {
   assert.equal(normalizeWorkerUrl('   '), '');
   assert.equal(normalizeWorkerUrl('my-worker.workers.dev///'), 'https://my-worker.workers.dev');
   assert.equal(normalizeWorkerUrl('  http://localhost:8787/  '), 'http://localhost:8787');
-  assert.equal(normalizeWorkerUrl('https://my-worker.workers.dev'), 'https://my-worker.workers.dev');
+  assert.equal(
+    normalizeWorkerUrl('https://my-worker.workers.dev'),
+    'https://my-worker.workers.dev'
+  );
 });
 
 test('getStateEndpoint and getBackupEndpoint format valid URLs', () => {
@@ -56,7 +55,10 @@ test('mergeLocalAddsIntoRemote handles null/undefined and merges non-duplicate l
   const result = mergeLocalAddsIntoRemote(remote, local);
 
   assert.equal(result.links.length, 2);
-  assert.deepEqual(result.links.map(l => l._id), ['l1', 'l2']);
+  assert.deepEqual(
+    result.links.map((l) => l._id),
+    ['l1', 'l2']
+  );
   // G2 should be automatically added to groups list because l2 belongs to G2
   assert.ok(result.groups.list.includes('G2'));
 });
@@ -83,7 +85,11 @@ test('normalizeLinks filters out invalid schemes like javascript: or chrome:', (
 });
 
 test('normalizeProfile ensures fallback to valid default pinned and selected groups', () => {
-  const DEFAULT_GROUPS = { list: ['Mạng xã hội', 'Công cụ'], pinned: ['Mạng xã hội'], selected: 'Mạng xã hội' };
+  const DEFAULT_GROUPS = {
+    list: ['Mạng xã hội', 'Công cụ'],
+    pinned: ['Mạng xã hội'],
+    selected: 'Mạng xã hội'
+  };
   const result = normalizeProfile(
     { pinned: ['NonExistent'], selected: 'InvalidGroup', settings: { iconSize: 'bad' } },
     DEFAULT_GROUPS
@@ -109,10 +115,18 @@ test('bootstrapCloud handles network failure cleanly without throwing', async ()
     syncWorkerUrlInput: { value: 'https://worker.dev' },
     syncApiCodeInput: { value: 'secret' },
     syncStatus: {
-      get textContent() { return statusMsg; },
-      set textContent(val) { statusMsg = val; },
-      get className() { return statusType; },
-      set className(val) { statusType = val; }
+      get textContent() {
+        return statusMsg;
+      },
+      set textContent(val) {
+        statusMsg = val;
+      },
+      get className() {
+        return statusType;
+      },
+      set className(val) {
+        statusType = val;
+      }
     }
   };
 

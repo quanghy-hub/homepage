@@ -1,173 +1,207 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New Tab</title>
+    <link rel="icon" type="image/png" href="../../assets/icons/icon128.png?v=2" />
+    <link rel="stylesheet" href="index.css" />
+    <link rel="stylesheet" href="modal.css" />
+    <link rel="stylesheet" href="settings.css" />
+  </head>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Tab</title>
-  <link rel="icon" type="image/png" href="../../assets/icons/icon128.png?v=2">
-  <link rel="stylesheet" href="index.css">
-  <link rel="stylesheet" href="modal.css">
-  <link rel="stylesheet" href="settings.css">
-</head>
-
-<body class="app-loading">
-  <div id="loading-shell" class="loading-shell" aria-hidden="true">
-    <div class="shell-grid">
-      <span class="shell-icon"></span>
-      <span class="shell-icon"></span>
-      <span class="shell-icon"></span>
-      <span class="shell-icon"></span>
-      <span class="shell-icon"></span>
-      <span class="shell-icon"></span>
-    </div>
-    <div class="shell-row">
-      <span class="shell-label"></span>
-      <span class="shell-plus"></span>
-    </div>
-    <div class="shell-grid shell-grid-secondary">
-      <span class="shell-icon"></span>
-      <span class="shell-icon"></span>
-      <span class="shell-icon"></span>
-      <span class="shell-icon"></span>
-    </div>
-    <div class="shell-tabs">
-      <span class="shell-tab"></span>
-      <span class="shell-tab"></span>
-      <span class="shell-tab"></span>
-    </div>
-  </div>
-
-  <div id="main-container">
-    <!-- Pinned Group Icons -->
-    <div class="links-grid" id="pinned-grid"></div>
-    <div id="quick-actions" class="quick-actions">
-      <button id="add-current-btn" class="quick-action-btn">+</button>
-      <div id="quick-action-status" class="quick-action-status"></div>
+  <body class="app-loading">
+    <div id="loading-shell" class="loading-shell" aria-hidden="true">
+      <div class="shell-grid">
+        <span class="shell-icon"></span>
+        <span class="shell-icon"></span>
+        <span class="shell-icon"></span>
+        <span class="shell-icon"></span>
+        <span class="shell-icon"></span>
+        <span class="shell-icon"></span>
+      </div>
+      <div class="shell-row">
+        <span class="shell-label"></span>
+        <span class="shell-plus"></span>
+      </div>
+      <div class="shell-grid shell-grid-secondary">
+        <span class="shell-icon"></span>
+        <span class="shell-icon"></span>
+        <span class="shell-icon"></span>
+        <span class="shell-icon"></span>
+      </div>
+      <div class="shell-tabs">
+        <span class="shell-tab"></span>
+        <span class="shell-tab"></span>
+        <span class="shell-tab"></span>
+      </div>
     </div>
 
-    <!-- Selected Group Icons -->
-    <div class="links-grid" id="selected-grid"></div>
+    <div id="main-container">
+      <!-- Pinned Group Icons -->
+      <div class="links-grid" id="pinned-grid"></div>
+      <div id="quick-actions" class="quick-actions">
+        <button id="add-current-btn" class="quick-action-btn">+</button>
+        <div id="quick-action-status" class="quick-action-status"></div>
+      </div>
 
-    <!-- Group Tabs (below icons) -->
-    <nav id="group-tabs"></nav>
-  </div>
+      <!-- Selected Group Icons -->
+      <div class="links-grid" id="selected-grid"></div>
 
-  <!-- Settings Button -->
-  <button id="settings-btn" title="Settings">
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5" />
-      <path
-        d="M16.2 12.3a1.3 1.3 0 00.26 1.43l.05.05a1.58 1.58 0 11-2.23 2.23l-.05-.05a1.3 1.3 0 00-1.43-.26 1.3 1.3 0 00-.79 1.19v.14a1.58 1.58 0 01-3.16 0v-.07a1.3 1.3 0 00-.85-1.19 1.3 1.3 0 00-1.43.26l-.05.05a1.58 1.58 0 11-2.23-2.23l.05-.05a1.3 1.3 0 00.26-1.43 1.3 1.3 0 00-1.19-.79h-.14a1.58 1.58 0 010-3.16h.07a1.3 1.3 0 001.19-.85 1.3 1.3 0 00-.26-1.43l-.05-.05a1.58 1.58 0 112.23-2.23l.05.05a1.3 1.3 0 001.43.26h.06a1.3 1.3 0 00.79-1.19v-.14a1.58 1.58 0 013.16 0v.07a1.3 1.3 0 00.79 1.19 1.3 1.3 0 001.43-.26l.05-.05a1.58 1.58 0 112.23 2.23l-.05.05a1.3 1.3 0 00-.26 1.43v.06a1.3 1.3 0 001.19.79h.14a1.58 1.58 0 010 3.16h-.07a1.3 1.3 0 00-1.19.79z"
-        stroke="currentColor" stroke-width="1.5" />
-    </svg>
-  </button>
+      <!-- Group Tabs (below icons) -->
+      <nav id="group-tabs"></nav>
+    </div>
 
-  <!-- Modal: Add / Edit Link -->
-  <div id="modal-overlay" class="modal-overlay hidden">
-    <div class="modal">
-      <h3 id="modal-title">Add Link</h3>
-      <div id="modal-body-link">
-        <label>URL
-          <input type="url" id="input-url" placeholder="https://example.com" autocomplete="off">
-        </label>
-        <label>Title (automatic if empty)
-          <input type="text" id="input-name" placeholder="Display Title" autocomplete="off">
-        </label>
-        <label>Group
-          <select id="input-group"></select>
-        </label>
-        <fieldset id="favicon-source-options" class="favicon-source-options hidden">
-          <legend>Favicon source</legend>
-          <label class="favicon-source-option">
-            <input type="radio" name="favicon-source" value="google" checked>
-            <img id="favicon-preview-google" alt="" width="24" height="24">
-            <span>Google S2</span>
+    <!-- Settings Button -->
+    <button id="settings-btn" title="Settings">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path
+          d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+        <path
+          d="M16.2 12.3a1.3 1.3 0 00.26 1.43l.05.05a1.58 1.58 0 11-2.23 2.23l-.05-.05a1.3 1.3 0 00-1.43-.26 1.3 1.3 0 00-.79 1.19v.14a1.58 1.58 0 01-3.16 0v-.07a1.3 1.3 0 00-.85-1.19 1.3 1.3 0 00-1.43.26l-.05.05a1.58 1.58 0 11-2.23-2.23l.05-.05a1.3 1.3 0 00.26-1.43 1.3 1.3 0 00-1.19-.79h-.14a1.58 1.58 0 010-3.16h.07a1.3 1.3 0 001.19-.85 1.3 1.3 0 00-.26-1.43l-.05-.05a1.58 1.58 0 112.23-2.23l.05.05a1.3 1.3 0 001.43.26h.06a1.3 1.3 0 00.79-1.19v-.14a1.58 1.58 0 013.16 0v.07a1.3 1.3 0 00.79 1.19 1.3 1.3 0 001.43-.26l.05-.05a1.58 1.58 0 112.23 2.23l-.05.05a1.3 1.3 0 00-.26 1.43v.06a1.3 1.3 0 001.19.79h.14a1.58 1.58 0 010 3.16h-.07a1.3 1.3 0 00-1.19.79z"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+      </svg>
+    </button>
+
+    <!-- Modal: Add / Edit Link -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+      <div class="modal">
+        <h3 id="modal-title">Add Link</h3>
+        <div id="modal-body-link">
+          <label
+            >URL
+            <input type="url" id="input-url" placeholder="https://example.com" autocomplete="off" />
           </label>
-          <label class="favicon-source-option">
-            <input type="radio" name="favicon-source" value="chrome">
-            <img id="favicon-preview-chrome" alt="" width="24" height="24">
-            <span>Chrome favicon</span>
+          <label
+            >Title (automatic if empty)
+            <input type="text" id="input-name" placeholder="Display Title" autocomplete="off" />
           </label>
-        </fieldset>
-      </div>
-      <div id="modal-body-group" class="hidden">
-        <label>Group Name
-          <input type="text" id="input-group-name" placeholder="New Group Name" autocomplete="off">
-        </label>
-      </div>
-      <div class="modal-actions">
-        <button id="modal-pin" class="secondary-btn hidden">Pin</button>
-        <button id="modal-delete" class="danger-btn hidden">Delete</button>
-        <button id="modal-cancel">Cancel</button>
-        <button id="modal-save">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Settings Panel -->
-  <div id="settings-overlay" class="modal-overlay hidden">
-    <div class="modal settings-modal">
-      <h3>Settings</h3>
-
-      <div class="settings-slider-row">
-        <span class="settings-slider-label">Icon Size</span>
-        <span id="setting-icon-size-val">56px</span>
-        <input type="range" id="setting-icon-size" min="32" max="80" value="56" step="2">
-      </div>
-
-      <div class="settings-section">
-        <div class="settings-inline-row">
-          <h4>Favicon Cache</h4>
-          <button id="cleanup-favicons" class="icon-action-btn" title="Clear Cached Favicons">🗑</button>
+          <label
+            >Group
+            <select id="input-group"></select>
+          </label>
+          <fieldset id="favicon-source-options" class="favicon-source-options hidden">
+            <legend>Favicon source</legend>
+            <label class="favicon-source-option">
+              <input type="radio" name="favicon-source" value="google" checked />
+              <img id="favicon-preview-google" alt="" width="24" height="24" />
+              <span>Google S2</span>
+            </label>
+            <label class="favicon-source-option">
+              <input type="radio" name="favicon-source" value="chrome" />
+              <img id="favicon-preview-chrome" alt="" width="24" height="24" />
+              <span>Chrome favicon</span>
+            </label>
+          </fieldset>
         </div>
-      </div>
-
-      <div class="settings-section">
-        <h4>Cloudflare Sync</h4>
-        <label>Worker URL
-          <input type="url" id="setting-sync-worker-url" placeholder="https://extension.your-subdomain.workers.dev" autocomplete="off">
-        </label>
-        <label>API Code</label>
-        <div class="token-row">
-          <input type="password" id="setting-sync-api-code" placeholder="API Code configured in SYNC_API_KEY" autocomplete="off">
-          <button id="verify-sync" class="icon-action-btn" title="Test Connection">✓</button>
-        </div>
-        <label>Profile</label>
-        <div class="segmented-control">
-          <label class="segment-option">
-            <input type="radio" name="sync-profile" value="macbook" checked>
-            <span>MacBook</span>
-          </label>
-          <label class="segment-option">
-            <input type="radio" name="sync-profile" value="mobile">
-            <span>Mobile</span>
+        <div id="modal-body-group" class="hidden">
+          <label
+            >Group Name
+            <input
+              type="text"
+              id="input-group-name"
+              placeholder="New Group Name"
+              autocomplete="off"
+            />
           </label>
         </div>
-        <div class="sync-live-row">
-          <label for="setting-sync-delay">Auto B</label>
-          <input id="setting-sync-delay" type="number" min="1" max="3600" step="1" inputmode="numeric" value="5">
-          <span>sec</span>
+        <div class="modal-actions">
+          <button id="modal-pin" class="secondary-btn hidden">Pin</button>
+          <button id="modal-delete" class="danger-btn hidden">Delete</button>
+          <button id="modal-cancel">Cancel</button>
+          <button id="modal-save">Save</button>
         </div>
-        <div class="sync-actions">
-          <button id="sync-push" class="btn-sync">Sync A Now</button>
-          <button id="sync-restore-a" class="btn-sync">Restore A</button>
-          <button id="sync-restore-b" class="btn-sync">Restore B</button>
-        </div>
-      </div>
-
-      <div class="settings-sync-status">
-        <div id="sync-verify-status" class="sync-status"></div>
-        <div id="sync-status" class="sync-status"></div>
-      </div>
-
-      <div class="modal-actions">
-        <button id="settings-close">Close</button>
       </div>
     </div>
-  </div>
 
-  <script type="module" src="index.js"></script>
-</body>
+    <!-- Settings Panel -->
+    <div id="settings-overlay" class="modal-overlay hidden">
+      <div class="modal settings-modal">
+        <h3>Settings</h3>
 
+        <div class="settings-slider-row">
+          <span class="settings-slider-label">Icon Size</span>
+          <span id="setting-icon-size-val">56px</span>
+          <input type="range" id="setting-icon-size" min="32" max="80" value="56" step="2" />
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-inline-row">
+            <h4>Favicon Cache</h4>
+            <button id="cleanup-favicons" class="icon-action-btn" title="Clear Cached Favicons">
+              🗑
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h4>Cloudflare Sync</h4>
+          <label
+            >Worker URL
+            <input
+              type="url"
+              id="setting-sync-worker-url"
+              placeholder="https://extension.your-subdomain.workers.dev"
+              autocomplete="off"
+            />
+          </label>
+          <label>API Code</label>
+          <div class="token-row">
+            <input
+              type="password"
+              id="setting-sync-api-code"
+              placeholder="API Code configured in SYNC_API_KEY"
+              autocomplete="off"
+            />
+            <button id="verify-sync" class="icon-action-btn" title="Test Connection">✓</button>
+          </div>
+          <label>Profile</label>
+          <div class="segmented-control">
+            <label class="segment-option">
+              <input type="radio" name="sync-profile" value="macbook" checked />
+              <span>MacBook</span>
+            </label>
+            <label class="segment-option">
+              <input type="radio" name="sync-profile" value="mobile" />
+              <span>Mobile</span>
+            </label>
+          </div>
+          <div class="sync-live-row">
+            <label for="setting-sync-delay">Auto B</label>
+            <input
+              id="setting-sync-delay"
+              type="number"
+              min="1"
+              max="3600"
+              step="1"
+              inputmode="numeric"
+              value="5"
+            />
+            <span>sec</span>
+          </div>
+          <div class="sync-actions">
+            <button id="sync-push" class="btn-sync">Sync A Now</button>
+            <button id="sync-restore-a" class="btn-sync">Restore A</button>
+            <button id="sync-restore-b" class="btn-sync">Restore B</button>
+          </div>
+        </div>
+
+        <div class="settings-sync-status">
+          <div id="sync-verify-status" class="sync-status"></div>
+          <div id="sync-status" class="sync-status"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="settings-close">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="index.js"></script>
+  </body>
 </html>

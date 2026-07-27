@@ -77,7 +77,12 @@ export function createSyncController({
     let updated;
     try {
       const config = getSyncSettings(dom);
-      updated = await pushCloudflareState(config.workerUrl, config.apiCode, getState(), getRevision());
+      updated = await pushCloudflareState(
+        config.workerUrl,
+        config.apiCode,
+        getState(),
+        getRevision()
+      );
       applyRemoteState(updated);
       syncReady = true;
       saveSyncReady(true);
@@ -90,7 +95,9 @@ export function createSyncController({
     if (showStatus) {
       const label = updated?.syncMerged
         ? 'B synced with newer cloud data'
-        : updated?.syncConflict ? 'B had newer update; restored' : 'B synced';
+        : updated?.syncConflict
+          ? 'B had newer update; restored'
+          : 'B synced';
       setSyncStatus(`✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
     }
     return updated;
@@ -115,10 +122,18 @@ export function createSyncController({
     render();
     refreshSettingsControls();
 
-    const updated = await pushCloudflareState(config.workerUrl, config.apiCode, getState(), getRevision());
+    const updated = await pushCloudflareState(
+      config.workerUrl,
+      config.apiCode,
+      getState(),
+      getRevision()
+    );
     applyRemoteState(updated);
     saveData({ skipAutoSync: true });
-    setSyncStatus(`✓ Restored backup ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
+    setSyncStatus(
+      `✓ Restored backup ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`,
+      'ok'
+    );
   }
 
   function scheduleAutoSync() {
@@ -129,10 +144,10 @@ export function createSyncController({
     }
     if (!syncReady) {
       bootstrapCloud()
-        .then(isReady => {
+        .then((isReady) => {
           if (isReady) scheduleAutoSync();
         })
-        .catch(err => {
+        .catch((err) => {
           setSyncStatus('✗ Cloud check error: ' + err.message, 'err');
         });
       return;
@@ -145,22 +160,30 @@ export function createSyncController({
         const updated = await pushToCloudflare(false);
         const label = updated?.syncMerged
           ? 'B synced with newer cloud data'
-          : updated?.syncConflict ? 'B had newer update; restored' : 'B synced';
-        setSyncStatus(`✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
+          : updated?.syncConflict
+            ? 'B had newer update; restored'
+            : 'B synced';
+        setSyncStatus(
+          `✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`,
+          'ok'
+        );
       } catch (err) {
         setSyncStatus('✗ Auto sync error: ' + err.message, 'err');
+        if (err.message === 'Failed to fetch' || err.message.toLowerCase().includes('network')) {
+          setTimeout(() => scheduleAutoSync(), 15000);
+        }
       }
     }, delayMs);
   }
 
-  async function restoreLatestFromB(showStatus = false) {
+  async function restoreLatestFromB(_showStatus = false) {
     if (autoSyncTimer || isPushing || isRestoring) return false;
 
     isRestoring = true;
     try {
       const config = getSyncSettings(dom);
       const remote = await pullCloudflareState(config.workerUrl, config.apiCode);
-      
+
       if (dom.syncStatus && dom.syncStatus.textContent.startsWith('✗ Auto restore error')) {
         setSyncStatus('');
       }
@@ -205,7 +228,10 @@ export function createSyncController({
         saveData({ skipAutoSync: true });
         render();
         refreshSettingsControls();
-        setSyncStatus(`✓ B restored · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`, 'ok');
+        setSyncStatus(
+          `✓ B restored · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`,
+          'ok'
+        );
       } else {
         setRevision(remoteRevision);
         saveSyncRevision(remoteRevision);
@@ -236,7 +262,7 @@ export function createSyncController({
     const intervalMs = Math.max(1, config.delaySeconds || 5) * 1000;
     autoRestoreTimer = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
-      restoreLatestFromB(false).catch(err => {
+      restoreLatestFromB(false).catch((err) => {
         if (err.message === 'Failed to fetch') {
           return;
         }
@@ -252,7 +278,7 @@ export function createSyncController({
         syncReady = false;
         bootstrapCloud()
           .then(() => startAutoRestore())
-          .catch(err => {
+          .catch((err) => {
             setSyncStatus('✗ Cloud check error: ' + err.message, 'err');
           });
       },
@@ -273,7 +299,10 @@ export function createSyncController({
         await bootstrapCloud({ force: true });
         const config = getSyncSettings(dom);
         const remote = await verifyCloudflareSync(config.workerUrl, config.apiCode);
-        setVerifyStatus(`✓ Connected to Worker successfully · ${revisionText(remote.revision || 0)} · ${formatSyncStamp()}`, 'ok');
+        setVerifyStatus(
+          `✓ Connected to Worker successfully · ${revisionText(remote.revision || 0)} · ${formatSyncStamp()}`,
+          'ok'
+        );
         startAutoRestore();
       } catch (err) {
         setVerifyStatus('✗ Connection failed · ' + err.message, 'err');

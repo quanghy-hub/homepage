@@ -27,13 +27,16 @@ function extractTitle(url, fallbackTitle) {
 
 function rememberRecentPage(tab) {
   if (!tab || !isTrackableUrl(tab.url)) return;
-  chrome.storage.local.set({
-    [RECENT_PAGE_KEY]: {
-      url: tab.url,
-      title: tab.title || extractTitle(tab.url),
-      updatedAt: Date.now()
-    }
-  }, () => void chrome.runtime.lastError);
+  chrome.storage.local.set(
+    {
+      [RECENT_PAGE_KEY]: {
+        url: tab.url,
+        title: tab.title || extractTitle(tab.url),
+        updatedAt: Date.now()
+      }
+    },
+    () => void chrome.runtime.lastError
+  );
 }
 
 function blobToDataUrl(blob) {
@@ -71,7 +74,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       for (const url of urls.filter(Boolean)) {
         if (!isHttpUrl(url)) continue;
         try {
-          const res = await fetch(url, { cache: 'force-cache' });
+          const res = await fetch(url, {
+            cache: 'force-cache',
+            headers: {
+              Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+              'User-Agent': navigator.userAgent
+            }
+          });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const blob = await res.blob();
           const dataUrl = await blobToDataUrl(blob);

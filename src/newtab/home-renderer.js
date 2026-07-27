@@ -69,14 +69,14 @@ export function createHomeRenderer({
     applySettings();
 
     dom.pinnedGrid.innerHTML = '';
-    groups.pinned.forEach(groupName => {
+    groups.pinned.forEach((groupName) => {
       const groupLinks = getLinksForGroup(groupName);
       if (groupLinks.length === 0 && groupName !== groups.pinned[0]) return;
 
       const grid = document.createElement('div');
       grid.className = 'links-grid';
       grid.dataset.group = groupName;
-      groupLinks.forEach(link => {
+      groupLinks.forEach((link) => {
         grid.appendChild(createLinkEl(link));
       });
 
@@ -101,15 +101,17 @@ export function createHomeRenderer({
     });
 
     dom.groupTabs.innerHTML = '';
-    groups.list.filter(groupName => !groups.pinned.includes(groupName)).forEach(groupName => {
-      const tab = document.createElement('button');
-      tab.className = 'tab' + (groupName === selectedGroup ? ' active' : '');
-      tab.textContent = groupName;
-      tab.dataset.groupName = groupName;
-      tab.classList.add('group-context-target');
-      tab.draggable = isEditMode();
-      dom.groupTabs.appendChild(tab);
-    });
+    groups.list
+      .filter((groupName) => !groups.pinned.includes(groupName))
+      .forEach((groupName) => {
+        const tab = document.createElement('button');
+        tab.className = 'tab' + (groupName === selectedGroup ? ' active' : '');
+        tab.textContent = groupName;
+        tab.dataset.groupName = groupName;
+        tab.classList.add('group-context-target');
+        tab.draggable = isEditMode();
+        dom.groupTabs.appendChild(tab);
+      });
 
     if (isEditMode()) {
       const addTab = document.createElement('button');
@@ -122,7 +124,7 @@ export function createHomeRenderer({
 
     dom.selectedGrid.innerHTML = '';
     dom.selectedGrid.dataset.group = selectedGroup || '';
-    getLinksForGroup(selectedGroup).forEach(link => {
+    getLinksForGroup(selectedGroup).forEach((link) => {
       dom.selectedGrid.appendChild(createLinkEl(link));
     });
   }
