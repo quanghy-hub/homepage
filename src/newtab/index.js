@@ -185,25 +185,24 @@ import { StateStore } from './state.js';
     });
   }
 
-  addCurrentBtn.addEventListener('click', () => {
-    chrome.storage.local.get([STORAGE_KEYS.recentPage], (result) => {
-      const recent = result[STORAGE_KEYS.recentPage];
-      if (!recent || !isHttpUrl(recent.url)) {
-        setQuickActionStatus(
-          'No recent page to add. Please open a website first, then return.',
-          'err'
-        );
-        modalController.fillAddLinkModal('', '', store.selectedGroup);
-        return;
-      }
-
-      setQuickActionStatus(`Retrieved: ${recent.title || recent.url}`, 'ok');
-      modalController.fillAddLinkModal(
-        recent.url,
-        recent.title || autoTitle(recent.url),
-        store.selectedGroup
+  addCurrentBtn.addEventListener('click', async () => {
+    const result = await browser.storage.local.get([STORAGE_KEYS.recentPage]);
+    const recent = result[STORAGE_KEYS.recentPage];
+    if (!recent || !isHttpUrl(recent.url)) {
+      setQuickActionStatus(
+        'No recent page to add. Please open a website first, then return.',
+        'err'
       );
-    });
+      modalController.fillAddLinkModal('', '', store.selectedGroup);
+      return;
+    }
+
+    setQuickActionStatus(`Retrieved: ${recent.title || recent.url}`, 'ok');
+    modalController.fillAddLinkModal(
+      recent.url,
+      recent.title || autoTitle(recent.url),
+      store.selectedGroup
+    );
   });
 
   const syncController = createSyncController({
@@ -236,7 +235,7 @@ import { StateStore } from './state.js';
   });
 
   /* ========== AUTO-REFRESH ON EXTERNAL CHANGES ========== */
-  chrome.storage.onChanged.addListener((changes, area) => {
+  browser.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && store.suppressStorageSync) return;
     if (
       area === 'local' &&

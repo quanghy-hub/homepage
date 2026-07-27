@@ -82,55 +82,48 @@ export function getProfileFromState(state) {
   );
 }
 
-export function loadAppData(state) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(
-      [
-        STORAGE_KEYS.links,
-        STORAGE_KEYS.groups,
-        STORAGE_KEYS.settings,
-        STORAGE_KEYS.profiles,
-        STORAGE_KEYS.syncProfile
-      ],
-      (result) => {
-        state.profileId = result[STORAGE_KEYS.syncProfile] || DEFAULT_PROFILE_ID;
+export async function loadAppData(state) {
+  const result = await browser.storage.local.get([
+    STORAGE_KEYS.links,
+    STORAGE_KEYS.groups,
+    STORAGE_KEYS.settings,
+    STORAGE_KEYS.profiles,
+    STORAGE_KEYS.syncProfile
+  ]);
+  state.profileId = result[STORAGE_KEYS.syncProfile] || DEFAULT_PROFILE_ID;
 
-        if (result[STORAGE_KEYS.links] && result[STORAGE_KEYS.links].length > 0) {
-          state.links = normalizeLinks(result[STORAGE_KEYS.links]);
-          state.groups = result[STORAGE_KEYS.groups] || deepClone(DEFAULT_GROUPS);
-          if (typeof state.groups.pinned === 'string') {
-            state.groups.pinned = [state.groups.pinned];
-          }
-        } else {
-          state.links = normalizeLinks(deepClone(DEFAULT_LINKS));
-          state.groups = deepClone(DEFAULT_GROUPS);
-        }
+  if (result[STORAGE_KEYS.links] && result[STORAGE_KEYS.links].length > 0) {
+    state.links = normalizeLinks(result[STORAGE_KEYS.links]);
+    state.groups = result[STORAGE_KEYS.groups] || deepClone(DEFAULT_GROUPS);
+    if (typeof state.groups.pinned === 'string') {
+      state.groups.pinned = [state.groups.pinned];
+    }
+  } else {
+    state.links = normalizeLinks(deepClone(DEFAULT_LINKS));
+    state.groups = deepClone(DEFAULT_GROUPS);
+  }
 
-        state.settings = normalizeSettings(result[STORAGE_KEYS.settings]);
-        const savedProfiles = result[STORAGE_KEYS.profiles] || {};
-        state.profiles = Object.assign(deepClone(DEFAULT_PROFILES), savedProfiles);
+  state.settings = normalizeSettings(result[STORAGE_KEYS.settings]);
+  const savedProfiles = result[STORAGE_KEYS.profiles] || {};
+  state.profiles = Object.assign(deepClone(DEFAULT_PROFILES), savedProfiles);
 
-        const activeProfile = normalizeProfile(
-          savedProfiles[state.profileId] || state.profiles[state.profileId] || null,
-          state.groups,
-          state.settings
-        );
-        state.profiles[state.profileId] = activeProfile;
-        state.groups.pinned = activeProfile.pinned;
-        state.groups.selected = activeProfile.selected;
-        state.settings = activeProfile.settings;
-        state.selectedGroup = state.groups.selected;
-        resolve();
-      }
-    );
-  });
+  const activeProfile = normalizeProfile(
+    savedProfiles[state.profileId] || state.profiles[state.profileId] || null,
+    state.groups,
+    state.settings
+  );
+  state.profiles[state.profileId] = activeProfile;
+  state.groups.pinned = activeProfile.pinned;
+  state.groups.selected = activeProfile.selected;
+  state.settings = activeProfile.settings;
+  state.selectedGroup = state.groups.selected;
 }
 
 export function saveAppData(state) {
   const profiles = Object.assign({}, state.profiles || {});
   profiles[state.profileId || DEFAULT_PROFILE_ID] = getProfileFromState(state);
 
-  chrome.storage.local.set({
+  browser.storage.local.set({
     [STORAGE_KEYS.links]: state.links,
     [STORAGE_KEYS.groups]: {
       list: state.groups.list

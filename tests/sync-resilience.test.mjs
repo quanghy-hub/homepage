@@ -101,10 +101,10 @@ test('normalizeProfile ensures fallback to valid default pinned and selected gro
 });
 
 test('bootstrapCloud handles network failure cleanly without throwing', async () => {
-  globalThis.chrome = {
+  globalThis.browser = {
     storage: {
       local: {
-        set: () => {}
+        set: async () => {}
       }
     }
   };
@@ -154,5 +154,5 @@ test('bootstrapCloud handles network failure cleanly without throwing', async ()
   assert.ok(statusMsg.includes('Cloud check failed'));
 
   globalThis.fetch = originalFetch;
-  delete globalThis.chrome;
+  delete globalThis.browser;
 });

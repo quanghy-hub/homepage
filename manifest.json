@@ -3,18 +3,24 @@
   "name": "Homepage",
   "version": "1.0.0",
   "description": "Custom new tab page with grouped quicklinks",
-  "incognito": "split",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "homepage-extension@quanghy.hub",
+      "strict_min_version": "112.0"
+    }
+  },
+  "incognito": "spanning",
   "chrome_url_overrides": {
     "newtab": "src/newtab/index.html"
   },
-  "permissions": ["storage", "tabs", "favicon"],
+  "permissions": ["storage", "tabs"],
   "host_permissions": [
     "https://www.google.com/*",
     "https://*.gstatic.com/*",
     "https://*.workers.dev/*"
   ],
   "background": {
-    "service_worker": "src/background/index.js",
+    "scripts": ["src/background/index.js"],
     "type": "module"
   },
   "icons": {

@@ -20,9 +20,15 @@ This project is built using native HTML, CSS, and modern Javascript (ES Modules)
 
 ## Getting Started
 
-### 1. Load the Extension in Chrome
+### 1. Load the Extension in Firefox or Chrome
 
-To run the Extension locally:
+#### Firefox
+
+1. Open Firefox and navigate to `about:debugging#/runtime/this-firefox` (or `about:debugging` -> **This Firefox**).
+2. Click **Load Temporary Add-on...**
+3. Select the `manifest.json` file in the root directory of this repository.
+
+#### Google Chrome
 
 1. Open Google Chrome and navigate to `chrome://extensions/`.
 2. Enable **Developer mode** (toggle in the top-right corner).

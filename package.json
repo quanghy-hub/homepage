@@ -11,6 +11,7 @@
     "lint": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\"",
     "lint:fix": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\" --fix",
     "format": "prettier --write .",
+    "build:firefox": "web-ext build --overwrite-dest",
     "prepare": "husky"
   },
   "lint-staged": {

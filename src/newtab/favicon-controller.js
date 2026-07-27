@@ -58,27 +58,26 @@ export function createFaviconController({ getFaviconCache, persistFaviconCache, 
     const urls = getFaviconCandidates(link.url);
     if (!key || !urls.length || (!force && pendingByKey.has(key))) return;
 
-    const pending = new Promise((resolve) => {
+    const pending = (async () => {
       try {
-        chrome.runtime.sendMessage({ type: 'fetch-favicon', urls }, (response) => {
-          if (chrome.runtime.lastError || !response?.ok || !response.dataUrl) {
-            resolve();
-            return;
-          }
+        const response = await browser.runtime.sendMessage({ type: 'fetch-favicon', urls });
+        if (!response?.ok || !response.dataUrl) {
+          return;
+        }
 
-          getFaviconCache()[key] = {
-            dataUrl: response.dataUrl,
-            sourceUrl: response.sourceUrl || '',
-            updatedAt: Date.now()
-          };
-          persistFaviconCache();
-          updateVisibleImages(key, response.dataUrl, target);
-          resolve();
-        });
+        getFaviconCache()[key] = {
+          dataUrl: response.dataUrl,
+          sourceUrl: response.sourceUrl || '',
+          updatedAt: Date.now()
+        };
+        persistFaviconCache();
+        updateVisibleImages(key, response.dataUrl, target);
       } catch {
-        resolve();
+        // ignore
+      } finally {
+        pendingByKey.delete(key);
       }
-    }).finally(() => pendingByKey.delete(key));
+    })();
 
     pendingByKey.set(key, pending);
   }

@@ -25,18 +25,19 @@ function extractTitle(url, fallbackTitle) {
   }
 }
 
-function rememberRecentPage(tab) {
+async function rememberRecentPage(tab) {
   if (!tab || !isTrackableUrl(tab.url)) return;
-  chrome.storage.local.set(
-    {
+  try {
+    await browser.storage.local.set({
       [RECENT_PAGE_KEY]: {
         url: tab.url,
         title: tab.title || extractTitle(tab.url),
         updatedAt: Date.now()
       }
-    },
-    () => void chrome.runtime.lastError
-  );
+    });
+  } catch (_) {
+    // ignore
+  }
 }
 
 function blobToDataUrl(blob) {
@@ -48,22 +49,22 @@ function blobToDataUrl(blob) {
   });
 }
 
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+browser.tabs.onActivated.addListener(async ({ tabId }) => {
   try {
-    const tab = await chrome.tabs.get(tabId);
+    const tab = await browser.tabs.get(tabId);
     rememberRecentPage(tab);
   } catch (_) {
     // ignore
   }
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' || changeInfo.url) {
     rememberRecentPage(tab);
   }
 });
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== 'fetch-favicon' || (!message.url && !Array.isArray(message.urls))) return;
 
   (async () => {
@@ -100,6 +101,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('src/newtab/index.html') });
+browser.action.onClicked.addListener(() => {
+  browser.tabs.create({ url: browser.runtime.getURL('src/newtab/index.html') });
 });

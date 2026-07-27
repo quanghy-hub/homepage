@@ -46,13 +46,9 @@ export class StateStore {
     });
   }
 
-  loadFaviconCache() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get([STORAGE_KEYS.faviconCache], (result) => {
-        this.faviconCache = result[STORAGE_KEYS.faviconCache] || {};
-        resolve();
-      });
-    });
+  async loadFaviconCache() {
+    const result = await browser.storage.local.get([STORAGE_KEYS.faviconCache]);
+    this.faviconCache = result[STORAGE_KEYS.faviconCache] || {};
   }
 
   saveData(options = {}) {
@@ -73,7 +69,7 @@ export class StateStore {
   }
 
   persistFaviconCache() {
-    chrome.storage.local.set({
+    browser.storage.local.set({
       [STORAGE_KEYS.faviconCache]: this.faviconCache
     });
   }

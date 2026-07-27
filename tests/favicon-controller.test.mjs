@@ -83,16 +83,14 @@ test('replaces the letter fallback immediately after a successful fetch', async 
   let appendedNode = null;
   let removedClass = '';
   const cache = {};
-  globalThis.chrome = {
+  globalThis.browser = {
     runtime: {
       id: 'extension-id',
-      lastError: null,
-      sendMessage: (_message, callback) =>
-        callback({
-          dataUrl: 'data:image/png;base64,aWNvbg==',
-          ok: true,
-          sourceUrl: getDefaultFaviconUrl('https://example.com/')
-        })
+      sendMessage: async (_message) => ({
+        dataUrl: 'data:image/png;base64,aWNvbg==',
+        ok: true,
+        sourceUrl: getDefaultFaviconUrl('https://example.com/')
+      })
     }
   };
   globalThis.document = { querySelectorAll: () => [] };
@@ -130,7 +128,7 @@ test('replaces the letter fallback immediately after a successful fetch', async 
   assert.equal(img.src, 'data:image/png;base64,aWNvbg==');
   assert.equal(appendedNode, img);
   assert.equal(removedClass, 'fallback-ready');
-  delete globalThis.chrome;
+  delete globalThis.browser;
   delete globalThis.document;
 });
 
@@ -146,19 +144,18 @@ test('refreshes an expired Google cache with Google candidates', async () => {
   };
   let idleTask;
   let persisted = false;
-  globalThis.chrome = {
+  globalThis.browser = {
     runtime: {
-      lastError: null,
-      sendMessage: (message, callback) => {
+      sendMessage: async (message) => {
         assert.deepEqual(message, {
           type: 'fetch-favicon',
           urls: getFaviconCandidates(pageUrl)
         });
-        callback({
+        return {
           dataUrl: 'data:image/svg+xml;base64,bmV3',
           ok: true,
           sourceUrl: googleUrl
-        });
+        };
       }
     }
   };
@@ -185,12 +182,12 @@ test('refreshes an expired Google cache with Google candidates', async () => {
   assert.equal(cache['https://example.com'].dataUrl, 'data:image/svg+xml;base64,bmV3');
   assert.equal(cache['https://example.com'].sourceUrl, googleUrl);
   assert.equal(persisted, true);
-  delete globalThis.chrome;
+  delete globalThis.browser;
   delete globalThis.document;
 });
 
 test('handles Chrome source directly without fetching or caching', () => {
-  globalThis.chrome = { runtime: { id: 'extension-id' } };
+  globalThis.browser = { runtime: { id: 'extension-id' } };
   let idleTaskScheduled = false;
   const controller = createFaviconController({
     getFaviconCache: () => {
@@ -228,5 +225,5 @@ test('handles Chrome source directly without fetching or caching', () => {
   );
   assert.equal(appendedImg, img);
   assert.equal(idleTaskScheduled, false);
-  delete globalThis.chrome;
+  delete globalThis.browser;
 });

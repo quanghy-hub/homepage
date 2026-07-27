@@ -5,25 +5,17 @@ import {
   normalizeFaviconSource
 } from '../shared/utils/link-utils.js';
 
-function requestFaviconDataUrl(urls) {
-  if (!urls.length) return Promise.resolve('');
-  return new Promise((resolve) => {
-    try {
-      chrome.runtime.sendMessage({ type: 'fetch-favicon', urls }, (response) => {
-        if (
-          chrome.runtime.lastError ||
-          !response?.ok ||
-          !response.dataUrl?.startsWith('data:image/')
-        ) {
-          resolve('');
-          return;
-        }
-        resolve(response.dataUrl);
-      });
-    } catch {
-      resolve('');
+async function requestFaviconDataUrl(urls) {
+  if (!urls.length) return '';
+  try {
+    const response = await browser.runtime.sendMessage({ type: 'fetch-favicon', urls });
+    if (!response?.ok || !response.dataUrl?.startsWith('data:image/')) {
+      return '';
     }
-  });
+    return response.dataUrl;
+  } catch {
+    return '';
+  }
 }
 
 export function loadFaviconPreview(

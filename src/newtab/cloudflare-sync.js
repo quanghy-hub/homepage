@@ -16,7 +16,7 @@ function normalizeDelaySeconds(value) {
 export function setSyncStatus(dom, msg, type = '') {
   dom.syncStatus.textContent = msg;
   dom.syncStatus.className = 'sync-status' + (type ? ' ' + type : '');
-  chrome.storage.local.set({
+  browser.storage.local.set({
     [STORAGE_KEYS.syncStatus]: msg,
     [STORAGE_KEYS.syncStatusType]: type
   });
@@ -26,40 +26,33 @@ export function setVerifyStatus(dom, msg, type = '') {
   if (!dom.syncVerifyStatus) return;
   dom.syncVerifyStatus.textContent = msg;
   dom.syncVerifyStatus.className = 'sync-status' + (type ? ' ' + type : '');
-  chrome.storage.local.set({
+  browser.storage.local.set({
     [STORAGE_KEYS.syncVerifyStatus]: msg,
     [STORAGE_KEYS.syncVerifyStatusType]: type
   });
 }
 
-export function loadSavedSyncStatuses(dom) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(
-      [
-        STORAGE_KEYS.syncStatus,
-        STORAGE_KEYS.syncStatusType,
-        STORAGE_KEYS.syncVerifyStatus,
-        STORAGE_KEYS.syncVerifyStatusType
-      ],
-      (result) => {
-        if (result[STORAGE_KEYS.syncStatus]) {
-          dom.syncStatus.textContent = result[STORAGE_KEYS.syncStatus];
-          dom.syncStatus.className =
-            'sync-status' +
-            (result[STORAGE_KEYS.syncStatusType] ? ' ' + result[STORAGE_KEYS.syncStatusType] : '');
-        }
-        if (dom.syncVerifyStatus && result[STORAGE_KEYS.syncVerifyStatus]) {
-          dom.syncVerifyStatus.textContent = result[STORAGE_KEYS.syncVerifyStatus];
-          dom.syncVerifyStatus.className =
-            'sync-status' +
-            (result[STORAGE_KEYS.syncVerifyStatusType]
-              ? ' ' + result[STORAGE_KEYS.syncVerifyStatusType]
-              : '');
-        }
-        resolve();
-      }
-    );
-  });
+export async function loadSavedSyncStatuses(dom) {
+  const result = await browser.storage.local.get([
+    STORAGE_KEYS.syncStatus,
+    STORAGE_KEYS.syncStatusType,
+    STORAGE_KEYS.syncVerifyStatus,
+    STORAGE_KEYS.syncVerifyStatusType
+  ]);
+  if (result[STORAGE_KEYS.syncStatus]) {
+    dom.syncStatus.textContent = result[STORAGE_KEYS.syncStatus];
+    dom.syncStatus.className =
+      'sync-status' +
+      (result[STORAGE_KEYS.syncStatusType] ? ' ' + result[STORAGE_KEYS.syncStatusType] : '');
+  }
+  if (dom.syncVerifyStatus && result[STORAGE_KEYS.syncVerifyStatus]) {
+    dom.syncVerifyStatus.textContent = result[STORAGE_KEYS.syncVerifyStatus];
+    dom.syncVerifyStatus.className =
+      'sync-status' +
+      (result[STORAGE_KEYS.syncVerifyStatusType]
+        ? ' ' + result[STORAGE_KEYS.syncVerifyStatusType]
+        : '');
+  }
 }
 
 export function getSyncSettings(dom) {
@@ -75,17 +68,19 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
   const onDelayChange = typeof handlers === 'object' ? handlers.onDelayChange : null;
 
   function markSyncConfigChanged() {
-    chrome.storage.local.set({ [STORAGE_KEYS.syncReady]: false });
+    browser.storage.local.set({ [STORAGE_KEYS.syncReady]: false });
     if (onConfigChange) onConfigChange();
   }
 
   dom.syncWorkerUrlInput.addEventListener('input', () => {
-    chrome.storage.local.set({ [STORAGE_KEYS.syncWorkerUrl]: dom.syncWorkerUrlInput.value.trim() });
+    browser.storage.local.set({
+      [STORAGE_KEYS.syncWorkerUrl]: dom.syncWorkerUrlInput.value.trim()
+    });
     markSyncConfigChanged();
   });
 
   dom.syncApiCodeInput.addEventListener('input', () => {
-    chrome.storage.local.set({ [STORAGE_KEYS.syncApiCode]: dom.syncApiCodeInput.value.trim() });
+    browser.storage.local.set({ [STORAGE_KEYS.syncApiCode]: dom.syncApiCodeInput.value.trim() });
     markSyncConfigChanged();
   });
 
@@ -99,60 +94,47 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
   const saveSyncDelay = () => {
     const delaySeconds = normalizeDelaySeconds(dom.syncDelayInput?.value);
     if (dom.syncDelayInput) dom.syncDelayInput.value = String(delaySeconds);
-    chrome.storage.local.set({ [STORAGE_KEYS.syncDelaySeconds]: delaySeconds });
+    browser.storage.local.set({ [STORAGE_KEYS.syncDelaySeconds]: delaySeconds });
     if (onDelayChange) onDelayChange();
   };
   dom.syncDelayInput?.addEventListener('change', saveSyncDelay);
   dom.syncDelayInput?.addEventListener('blur', saveSyncDelay);
 }
 
-export function loadSavedSyncCredentials(dom) {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(
-      [
-        STORAGE_KEYS.syncWorkerUrl,
-        STORAGE_KEYS.syncApiCode,
-        STORAGE_KEYS.syncProfile,
-        STORAGE_KEYS.syncDelaySeconds
-      ],
-      (result) => {
-        dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
-        dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
-        dom.syncProfileSelect.value = PROFILE_IDS.includes(result[STORAGE_KEYS.syncProfile])
-          ? result[STORAGE_KEYS.syncProfile]
-          : DEFAULT_PROFILE_ID;
-        if (dom.syncDelayInput) {
-          const savedDelay = Number(result[STORAGE_KEYS.syncDelaySeconds]);
-          dom.syncDelayInput.value = String(normalizeDelaySeconds(savedDelay));
-        }
-        resolve();
-      }
-    );
-  });
+export async function loadSavedSyncCredentials(dom) {
+  const result = await browser.storage.local.get([
+    STORAGE_KEYS.syncWorkerUrl,
+    STORAGE_KEYS.syncApiCode,
+    STORAGE_KEYS.syncProfile,
+    STORAGE_KEYS.syncDelaySeconds
+  ]);
+  dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
+  dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
+  dom.syncProfileSelect.value = PROFILE_IDS.includes(result[STORAGE_KEYS.syncProfile])
+    ? result[STORAGE_KEYS.syncProfile]
+    : DEFAULT_PROFILE_ID;
+  if (dom.syncDelayInput) {
+    const savedDelay = Number(result[STORAGE_KEYS.syncDelaySeconds]);
+    dom.syncDelayInput.value = String(normalizeDelaySeconds(savedDelay));
+  }
 }
 
-export function loadSavedSyncRevision() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([STORAGE_KEYS.syncRevision], (result) => {
-      const revision = result[STORAGE_KEYS.syncRevision];
-      resolve(Number.isSafeInteger(revision) ? revision : null);
-    });
-  });
+export async function loadSavedSyncRevision() {
+  const result = await browser.storage.local.get([STORAGE_KEYS.syncRevision]);
+  const revision = result[STORAGE_KEYS.syncRevision];
+  return Number.isSafeInteger(revision) ? revision : null;
 }
 
 export function saveSyncRevision(revision) {
   if (!Number.isSafeInteger(revision)) return;
-  chrome.storage.local.set({ [STORAGE_KEYS.syncRevision]: revision });
+  browser.storage.local.set({ [STORAGE_KEYS.syncRevision]: revision });
 }
 
-export function loadSyncReady() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([STORAGE_KEYS.syncReady], (result) => {
-      resolve(result[STORAGE_KEYS.syncReady] === true);
-    });
-  });
+export async function loadSyncReady() {
+  const result = await browser.storage.local.get([STORAGE_KEYS.syncReady]);
+  return result[STORAGE_KEYS.syncReady] === true;
 }
 
 export function saveSyncReady(isReady) {
-  chrome.storage.local.set({ [STORAGE_KEYS.syncReady]: isReady === true });
+  browser.storage.local.set({ [STORAGE_KEYS.syncReady]: isReady === true });
 }
