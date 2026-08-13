@@ -10,7 +10,8 @@ export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode
       !!target &&
       !target.closest('.modal') &&
       !target.closest('.settings-modal') &&
-      !target.closest('#settings-btn')
+      !target.closest('#settings-btn') &&
+      !target.closest('#edit-mode-btn')
     );
   }
 
@@ -66,17 +67,20 @@ export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode
     true
   );
 
-  // Mouse double-click to exit/save edit mode
+  // Double-click to toggle edit mode
   document.addEventListener(
     'dblclick',
     (e) => {
-      if (!isEditMode()) return;
-      if (e.button !== 0) return; // Only left click
+      if (e.button !== 0 && e.button !== undefined) return; // Only left click
       if (!canStartLongPress(e.target) || e.target.closest('.modal-overlay')) return;
 
       e.preventDefault();
       e.stopPropagation();
-      exitEditMode();
+      if (isEditMode()) {
+        exitEditMode();
+      } else {
+        enterEditMode();
+      }
     },
     true
   );
@@ -137,17 +141,17 @@ export function bindEditModeActivation({ enterEditMode, exitEditMode, isEditMode
   document.addEventListener('touchcancel', clearLongPress, { passive: true });
 
   document.addEventListener('mousedown', (e) => {
-    if (e.button !== 0 || isTouchDevice) return;
+    if (e.button !== 0) return;
     startLongPress(e.target, e.clientX, e.clientY, 480);
   });
 
   document.addEventListener('mousemove', (e) => {
-    if (isTouchDevice) return;
     cancelLongPressOnMove(e.clientX, e.clientY);
   });
 
-  document.addEventListener('mouseup', () => {
-    if (isTouchDevice) return;
+  document.addEventListener('mouseup', (e) => {
+    if (e.button !== 0) return;
     cancelLongPress();
   });
 }
+

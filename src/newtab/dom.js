@@ -18,6 +18,7 @@ export function getDomRefs() {
     pinnedGrid: document.getElementById('pinned-grid'),
     groupTabs: document.getElementById('group-tabs'),
     selectedGrid: document.getElementById('selected-grid'),
+    editModeBtn: document.getElementById('edit-mode-btn'),
     settingsBtn: document.getElementById('settings-btn'),
     modalOverlay: document.getElementById('modal-overlay'),
     modalTitle: document.getElementById('modal-title'),

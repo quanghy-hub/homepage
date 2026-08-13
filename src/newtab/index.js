@@ -18,9 +18,17 @@ import { StateStore } from './state.js';
 
   /* ========== DOM REFS ========== */
   const dom = getDomRefs();
-  const { addCurrentBtn, quickActionStatus, syncProfileSelect } = dom;
+  const { addCurrentBtn, editModeBtn, quickActionStatus, syncProfileSelect } = dom;
   const IS_TOUCH_DEVICE =
     window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+
+  editModeBtn?.addEventListener('click', () => {
+    if (store.isEditMode) {
+      exitEditMode();
+    } else {
+      enterEditMode();
+    }
+  });
 
   /* ========== BIND STATE CALLBACKS ========== */
   store.onRender = render;
@@ -145,13 +153,6 @@ import { StateStore } from './state.js';
         return;
       }
 
-      const groupTarget = e.target.closest('.group-context-target');
-      if (groupTarget && store.isEditMode) {
-        e.preventDefault();
-        openGroupEditor(groupTarget.dataset.groupName || store.selectedGroup);
-        return;
-      }
-
       const tab = e.target.closest('#group-tabs .tab');
       if (tab) {
         if (tab.dataset.action === 'add-group') {
@@ -160,28 +161,46 @@ import { StateStore } from './state.js';
           modalController.openModal('add-group');
           return;
         }
-        store.selectedGroup = tab.dataset.groupName;
-        store.groups.selected = store.selectedGroup;
+
+        const groupName = tab.dataset.groupName;
+        if (!groupName) return;
+
+        if (store.isEditMode && groupName === store.selectedGroup) {
+          e.preventDefault();
+          openGroupEditor(groupName);
+          return;
+        }
+
+        e.preventDefault();
+        store.setSelectedGroup(groupName);
         store.saveData();
         render();
+        return;
+      }
+
+      const pinnedHeader = e.target.closest('.pinned-group-header');
+      if (pinnedHeader && store.isEditMode) {
+        e.preventDefault();
+        openGroupEditor(pinnedHeader.dataset.groupName);
         return;
       }
     });
 
     document.addEventListener('contextmenu', (e) => {
-      if (!store.isEditMode) return;
-      const draggableTarget = e.target.closest(
-        '.link-item, .pinned-group-header, #group-tabs .tab:not(.tab-add-group)'
-      );
-      if (draggableTarget && IS_TOUCH_DEVICE) {
-        e.preventDefault();
-        return;
+      const groupTarget = e.target.closest('.group-context-target');
+      const linkTarget = e.target.closest('.link-item');
+      if (!groupTarget && !linkTarget) return;
+
+      e.preventDefault();
+      if (!store.isEditMode) {
+        enterEditMode();
       }
 
-      const groupTarget = e.target.closest('.group-context-target');
-      if (!groupTarget) return;
-      e.preventDefault();
-      openGroupEditor(groupTarget.dataset.groupName || store.selectedGroup);
+      if (linkTarget) {
+        openLinkEditor(linkTarget.dataset.id);
+      } else if (groupTarget) {
+        openGroupEditor(groupTarget.dataset.groupName || store.selectedGroup);
+      }
     });
   }
 
@@ -232,6 +251,28 @@ import { StateStore } from './state.js';
       modalController.closeModal();
       settingsController.close();
       exitEditMode();
+      return;
+    }
+
+    if (e.key === 'e' || e.key === 'E') {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.isContentEditable);
+      const isModalOpen =
+        !dom.modalOverlay.classList.contains('hidden') ||
+        !dom.settingsOverlay.classList.contains('hidden');
+
+      if (!isInput && !isModalOpen) {
+        e.preventDefault();
+        if (store.isEditMode) {
+          exitEditMode();
+        } else {
+          enterEditMode();
+        }
+      }
     }
   });
 
