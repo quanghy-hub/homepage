@@ -1,6 +1,27 @@
-import { isHttpUrl } from '../shared/utils/link-utils.js';
+/**
+ * Extension background service worker.
+ *
+ * This worker is intentionally a self-contained CLASSIC script (no `import`
+ * statements and no `"type": "module"` in manifest.json). Module-type extension
+ * service workers are not reliably registrable on Chromium browsers for
+ * Android, which surfaces as a generic "Service worker registration failed".
+ *
+ * Every `chrome.*` namespace is guarded before use so a missing API on a given
+ * platform (e.g. Android) can never throw during top-level evaluation, which
+ * would also prevent the worker from registering.
+ */
+'use strict';
 
 const RECENT_PAGE_KEY = 'recentPage';
+
+function isHttpUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 function isTrackableUrl(url) {
   return isHttpUrl(url);
@@ -27,7 +48,9 @@ function extractTitle(url, fallbackTitle) {
 
 function rememberRecentPage(tab) {
   if (!tab || !isTrackableUrl(tab.url)) return;
-  chrome.storage.local.set(
+  const storageArea = typeof chrome !== 'undefined' && chrome.storage?.local;
+  if (!storageArea?.set) return;
+  storageArea.set(
     {
       [RECENT_PAGE_KEY]: {
         url: tab.url,
@@ -35,7 +58,7 @@ function rememberRecentPage(tab) {
         updatedAt: Date.now()
       }
     },
-    () => void chrome.runtime.lastError
+    () => void chrome?.runtime?.lastError
   );
 }
 
@@ -48,58 +71,72 @@ function blobToDataUrl(blob) {
   });
 }
 
-chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    rememberRecentPage(tab);
-  } catch (_) {
-    // ignore
-  }
-});
+/* Resolve API namespaces safely (may be partially unavailable on Android). */
+const root = typeof chrome !== 'undefined' ? chrome : {};
+const runtime = root.runtime || {};
+const tabs = root.tabs || {};
+const action = root.action || {};
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' || changeInfo.url) {
-    rememberRecentPage(tab);
-  }
-});
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type !== 'fetch-favicon' || (!message.url && !Array.isArray(message.urls))) return;
-
-  (async () => {
+if (tabs.onActivated?.addListener) {
+  tabs.onActivated.addListener(async ({ tabId }) => {
     try {
-      const urls = Array.isArray(message.urls) ? message.urls : [message.url];
-      let lastError = null;
-
-      for (const url of urls.filter(Boolean)) {
-        if (!isHttpUrl(url)) continue;
-        try {
-          const res = await fetch(url, {
-            cache: 'force-cache',
-            headers: {
-              Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-              'User-Agent': navigator.userAgent
-            }
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const blob = await res.blob();
-          const dataUrl = await blobToDataUrl(blob);
-          sendResponse({ ok: true, dataUrl, sourceUrl: url });
-          return;
-        } catch (err) {
-          lastError = err;
-        }
-      }
-
-      throw lastError || new Error('No favicon candidates');
-    } catch (err) {
-      sendResponse({ ok: false, error: err.message });
+      const tab = await tabs.get(tabId);
+      rememberRecentPage(tab);
+    } catch (_) {
+      // The tab may already be closed; nothing to remember.
     }
-  })();
+  });
+}
 
-  return true;
-});
+if (tabs.onUpdated?.addListener) {
+  tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' || changeInfo.url) {
+      rememberRecentPage(tab);
+    }
+  });
+}
 
-chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('src/newtab/index.html') });
-});
+if (runtime.onMessage?.addListener) {
+  runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.type !== 'fetch-favicon' || (!message.url && !Array.isArray(message.urls))) return;
+
+    (async () => {
+      try {
+        const urls = Array.isArray(message.urls) ? message.urls : [message.url];
+        let lastError = null;
+
+        for (const url of urls.filter(Boolean)) {
+          if (!isHttpUrl(url)) continue;
+          try {
+            const res = await fetch(url, {
+              cache: 'force-cache',
+              headers: {
+                Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'User-Agent': navigator.userAgent
+              }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const dataUrl = await blobToDataUrl(blob);
+            sendResponse({ ok: true, dataUrl, sourceUrl: url });
+            return;
+          } catch (err) {
+            lastError = err;
+          }
+        }
+
+        throw lastError || new Error('No favicon candidates');
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message });
+      }
+    })();
+
+    return true;
+  });
+}
+
+if (action.onClicked?.addListener && tabs.create && runtime.getURL) {
+  action.onClicked.addListener(() => {
+    tabs.create({ url: runtime.getURL('src/newtab/index.html') });
+  });
+}

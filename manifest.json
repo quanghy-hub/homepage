@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Homepage",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Custom new tab page with grouped quicklinks",
   "incognito": "split",
   "chrome_url_overrides": {
@@ -14,8 +14,7 @@
     "https://*.workers.dev/*"
   ],
   "background": {
-    "service_worker": "src/background/index.js",
-    "type": "module"
+    "service_worker": "src/background/index.js"
   },
   "icons": {
     "16": "assets/icons/icon16.png",
