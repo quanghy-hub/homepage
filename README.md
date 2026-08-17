@@ -77,13 +77,15 @@ To enable syncing across multiple devices, deploy the Cloudflare Worker in the `
 │   ├── src/                 # Worker logic, storage and normalizers
 │   └── wrangler.toml        # Cloudflare Wrangler configuration
 └── src/                     # Frontend codebase
-    ├── background/          # Service worker for background actions (recent tabs)
+    ├── popup/               # Toolbar action popup (opens the new tab page)
     ├── shared/              # Shared constants and utility functions
     └── newtab/              # New Tab page client
         ├── index.html       # Page layout
         ├── index.css        # Layout & core styling
         ├── modal.css        # Modal form styling
         ├── settings.css     # Settings & sync panel styling
+        ├── favicon-fetch.js # In-page favicon fetching (no background worker)
+        ├── recent-page.js   # Resolves the last-visited page at click time
         └── index.js         # Entry point & event binding
 ```
 

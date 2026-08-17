@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createFaviconController, FAVICON_CACHE_TTL } from '../src/newtab/favicon-controller.js';
-import {
-  FAVICON_SOURCES,
-  getDefaultFaviconUrl,
-  getFaviconCandidates
-} from '../src/shared/utils/link-utils.js';
+import { FAVICON_SOURCES, getDefaultFaviconUrl } from '../src/shared/utils/link-utils.js';
+
+const flush = async () => {
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
+};
 
 test('uses a fresh local favicon cache for 14 days without fetching', () => {
   const pageUrl = 'https://example.com/';
@@ -83,16 +83,11 @@ test('replaces the letter fallback immediately after a successful fetch', async 
   let appendedNode = null;
   let removedClass = '';
   const cache = {};
-  globalThis.chrome = {
-    runtime: {
-      id: 'extension-id',
-      lastError: null,
-      sendMessage: (_message, callback) =>
-        callback({
-          dataUrl: 'data:image/png;base64,aWNvbg==',
-          ok: true,
-          sourceUrl: getDefaultFaviconUrl('https://example.com/')
-        })
+  globalThis.fetch = async () => ({ ok: true, status: 200, blob: async () => ({}) });
+  globalThis.FileReader = class {
+    readAsDataURL() {
+      this.result = 'data:image/png;base64,aWNvbg==';
+      this.onloadend?.();
     }
   };
   globalThis.document = { querySelectorAll: () => [] };
@@ -125,12 +120,13 @@ test('replaces the letter fallback immediately after a successful fetch', async 
     link: { title: 'Example', url: 'https://example.com/' }
   });
   idleTask();
-  await Promise.resolve();
+  await flush();
 
   assert.equal(img.src, 'data:image/png;base64,aWNvbg==');
   assert.equal(appendedNode, img);
   assert.equal(removedClass, 'fallback-ready');
-  delete globalThis.chrome;
+  delete globalThis.fetch;
+  delete globalThis.FileReader;
   delete globalThis.document;
 });
 
@@ -146,20 +142,15 @@ test('refreshes an expired Google cache with Google candidates', async () => {
   };
   let idleTask;
   let persisted = false;
-  globalThis.chrome = {
-    runtime: {
-      lastError: null,
-      sendMessage: (message, callback) => {
-        assert.deepEqual(message, {
-          type: 'fetch-favicon',
-          urls: getFaviconCandidates(pageUrl)
-        });
-        callback({
-          dataUrl: 'data:image/svg+xml;base64,bmV3',
-          ok: true,
-          sourceUrl: googleUrl
-        });
-      }
+  const fetchedUrls = [];
+  globalThis.fetch = async (url) => {
+    fetchedUrls.push(url);
+    return { ok: true, status: 200, blob: async () => ({}) };
+  };
+  globalThis.FileReader = class {
+    readAsDataURL() {
+      this.result = 'data:image/svg+xml;base64,bmV3';
+      this.onloadend?.();
     }
   };
   globalThis.document = { querySelectorAll: () => [] };
@@ -180,12 +171,15 @@ test('refreshes an expired Google cache with Google candidates', async () => {
     link: { title: 'Example', url: pageUrl }
   });
   idleTask();
-  await Promise.resolve();
+  await flush();
 
   assert.equal(cache['https://example.com'].dataUrl, 'data:image/svg+xml;base64,bmV3');
   assert.equal(cache['https://example.com'].sourceUrl, googleUrl);
   assert.equal(persisted, true);
-  delete globalThis.chrome;
+  assert.ok(fetchedUrls.length > 0);
+  assert.equal(fetchedUrls[0], googleUrl);
+  delete globalThis.fetch;
+  delete globalThis.FileReader;
   delete globalThis.document;
 });
 

@@ -1,10 +1,10 @@
-import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
 import { autoTitle, isHttpUrl } from '../shared/utils/link-utils.js';
 import { getDomRefs } from './dom.js';
 import { bindDragDrop } from './drag-drop.js';
 import { bindEditModeActivation } from './edit-mode.js';
 import { createHomeRenderer } from './home-renderer.js';
 import { createModalController } from './modal-controller.js';
+import { resolveRecentPage } from './recent-page.js';
 import { createSettingsController } from './settings-controller.js';
 import { createSyncController } from './sync-controller.js';
 import { normalizeSettings } from './storage.js';
@@ -204,25 +204,23 @@ import { StateStore } from './state.js';
     });
   }
 
-  addCurrentBtn.addEventListener('click', () => {
-    chrome.storage.local.get([STORAGE_KEYS.recentPage], (result) => {
-      const recent = result[STORAGE_KEYS.recentPage];
-      if (!recent || !isHttpUrl(recent.url)) {
-        setQuickActionStatus(
-          'No recent page to add. Please open a website first, then return.',
-          'err'
-        );
-        modalController.fillAddLinkModal('', '', store.selectedGroup);
-        return;
-      }
-
-      setQuickActionStatus(`Retrieved: ${recent.title || recent.url}`, 'ok');
-      modalController.fillAddLinkModal(
-        recent.url,
-        recent.title || autoTitle(recent.url),
-        store.selectedGroup
+  addCurrentBtn.addEventListener('click', async () => {
+    const recent = await resolveRecentPage();
+    if (!recent || !isHttpUrl(recent.url)) {
+      setQuickActionStatus(
+        'No recent page to add. Please open a website first, then return.',
+        'err'
       );
-    });
+      modalController.fillAddLinkModal('', '', store.selectedGroup);
+      return;
+    }
+
+    setQuickActionStatus(`Retrieved: ${recent.title || recent.url}`, 'ok');
+    modalController.fillAddLinkModal(
+      recent.url,
+      recent.title || autoTitle(recent.url),
+      store.selectedGroup
+    );
   });
 
   const syncController = createSyncController({

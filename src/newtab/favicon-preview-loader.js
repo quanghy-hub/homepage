@@ -4,26 +4,13 @@ import {
   getFaviconUrl,
   normalizeFaviconSource
 } from '../shared/utils/link-utils.js';
+import { fetchFaviconDataUrl } from './favicon-fetch.js';
 
 function requestFaviconDataUrl(urls) {
   if (!urls.length) return Promise.resolve('');
-  return new Promise((resolve) => {
-    try {
-      chrome.runtime.sendMessage({ type: 'fetch-favicon', urls }, (response) => {
-        if (
-          chrome.runtime.lastError ||
-          !response?.ok ||
-          !response.dataUrl?.startsWith('data:image/')
-        ) {
-          resolve('');
-          return;
-        }
-        resolve(response.dataUrl);
-      });
-    } catch {
-      resolve('');
-    }
-  });
+  return fetchFaviconDataUrl(urls)
+    .then(({ dataUrl }) => dataUrl)
+    .catch(() => '');
 }
 
 export function loadFaviconPreview(

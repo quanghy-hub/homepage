@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Homepage",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Custom new tab page with grouped quicklinks",
   "incognito": "split",
   "chrome_url_overrides": {
@@ -13,15 +13,14 @@
     "https://*.gstatic.com/*",
     "https://*.workers.dev/*"
   ],
-  "background": {
-    "service_worker": "src/background/index.js"
-  },
   "icons": {
     "16": "assets/icons/icon16.png",
     "48": "assets/icons/icon48.png",
     "128": "assets/icons/icon128.png"
   },
   "action": {
+    "default_title": "Homepage",
+    "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "assets/icons/icon16.png",
       "48": "assets/icons/icon48.png",

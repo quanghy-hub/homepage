@@ -5,6 +5,7 @@ import {
   getFaviconUrl,
   normalizeFaviconSource
 } from '../shared/utils/link-utils.js';
+import { fetchFaviconDataUrl } from './favicon-fetch.js';
 
 export const FAVICON_CACHE_TTL = 1000 * 60 * 60 * 24 * 14;
 
@@ -58,27 +59,20 @@ export function createFaviconController({ getFaviconCache, persistFaviconCache, 
     const urls = getFaviconCandidates(link.url);
     if (!key || !urls.length || (!force && pendingByKey.has(key))) return;
 
-    const pending = new Promise((resolve) => {
-      try {
-        chrome.runtime.sendMessage({ type: 'fetch-favicon', urls }, (response) => {
-          if (chrome.runtime.lastError || !response?.ok || !response.dataUrl) {
-            resolve();
-            return;
-          }
-
-          getFaviconCache()[key] = {
-            dataUrl: response.dataUrl,
-            sourceUrl: response.sourceUrl || '',
-            updatedAt: Date.now()
-          };
-          persistFaviconCache();
-          updateVisibleImages(key, response.dataUrl, target);
-          resolve();
-        });
-      } catch {
-        resolve();
-      }
-    }).finally(() => pendingByKey.delete(key));
+    const pending = fetchFaviconDataUrl(urls)
+      .then(({ dataUrl, sourceUrl }) => {
+        getFaviconCache()[key] = {
+          dataUrl,
+          sourceUrl: sourceUrl || '',
+          updatedAt: Date.now()
+        };
+        persistFaviconCache();
+        updateVisibleImages(key, dataUrl, target);
+      })
+      .catch(() => {
+        // All candidates failed; keep the existing letter fallback.
+      })
+      .finally(() => pendingByKey.delete(key));
 
     pendingByKey.set(key, pending);
   }
