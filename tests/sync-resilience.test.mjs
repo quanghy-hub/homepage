@@ -5,9 +5,15 @@ import {
   getBackupEndpoint,
   getStateEndpoint,
   mergeLocalAddsIntoRemote,
+  mergeDeletedMaps,
   normalizeWorkerUrl
 } from '../src/newtab/sync-api.js';
-import { normalizeLinks, normalizeProfile, normalizeSettings } from '../src/newtab/storage.js';
+import {
+  normalizeDeletedMap,
+  normalizeLinks,
+  normalizeProfile,
+  normalizeSettings
+} from '../src/newtab/storage.js';
 import { createSyncController } from '../src/newtab/sync-controller.js';
 
 test('normalizeWorkerUrl handles various edge cases correctly', () => {
@@ -61,6 +67,96 @@ test('mergeLocalAddsIntoRemote handles null/undefined and merges non-duplicate l
   );
   // G2 should be automatically added to groups list because l2 belongs to G2
   assert.ok(result.groups.list.includes('G2'));
+});
+
+test('keeps the local version of a shared link when it was edited more recently', () => {
+  const remote = {
+    links: [{ _id: 'l1', url: 'https://a.com', title: 'Remote title', updatedAt: 1000 }],
+    groups: { list: ['G1'] }
+  };
+  const local = {
+    links: [{ _id: 'l1', url: 'https://a.com', title: 'Local title', updatedAt: 2000 }],
+    groups: { list: ['G1'] }
+  };
+
+  const result = mergeLocalAddsIntoRemote(remote, local);
+
+  assert.equal(result.links.length, 1);
+  assert.equal(result.links[0].title, 'Local title');
+});
+
+test('keeps the remote version of a shared link when it is newer', () => {
+  const remote = {
+    links: [{ _id: 'l1', url: 'https://a.com', title: 'Remote title', updatedAt: 2000 }],
+    groups: { list: ['G1'] }
+  };
+  const local = {
+    links: [{ _id: 'l1', url: 'https://a.com', title: 'Local title', updatedAt: 1000 }],
+    groups: { list: ['G1'] }
+  };
+
+  const result = mergeLocalAddsIntoRemote(remote, local);
+
+  assert.equal(result.links.length, 1);
+  assert.equal(result.links[0].title, 'Remote title');
+});
+
+test('drops local-only links that were deleted on the remote side (tombstone)', () => {
+  const remote = {
+    links: [],
+    groups: { list: [] },
+    deletedMap: { l1: 3000 }
+  };
+  const local = {
+    links: [{ _id: 'l1', url: 'https://a.com', updatedAt: 1000 }],
+    groups: { list: ['G1'] }
+  };
+
+  const result = mergeLocalAddsIntoRemote(remote, local);
+
+  assert.deepEqual(result.links, []);
+  assert.deepEqual(result.deletedMap, { l1: 3000 });
+});
+
+test('keeps a link edited after a remote deletion (edit-after-delete wins)', () => {
+  const remote = {
+    links: [{ _id: 'l9', url: 'https://z.com', updatedAt: 5000 }],
+    groups: { list: ['G2'] },
+    deletedMap: { l1: 3000 }
+  };
+  const local = {
+    links: [{ _id: 'l1', url: 'https://a.com', title: 'Edited later', updatedAt: 4000 }],
+    groups: { list: ['G1'] }
+  };
+
+  const result = mergeLocalAddsIntoRemote(remote, local);
+
+  assert.equal(result.links.length, 2);
+  assert.equal(result.links.find((l) => l._id === 'l1').title, 'Edited later');
+});
+
+test('merges deletedMap tombstones from both sides keeping the newest timestamp', () => {
+  const remote = { links: [], groups: { list: [] }, deletedMap: { l1: 100, l2: 100 } };
+  const local = { links: [], groups: { list: [] }, deletedMap: { l2: 200 } };
+
+  const result = mergeLocalAddsIntoRemote(remote, local);
+
+  assert.deepEqual(result.deletedMap, { l1: 100, l2: 200 });
+});
+
+test('mergeDeletedMaps unions maps and ignores invalid entries', () => {
+  assert.deepEqual(mergeDeletedMaps({ a: 1 }, { a: 3, b: 2 }, { b: 'x' }), { a: 3, b: 2 });
+  assert.deepEqual(mergeDeletedMaps(null, undefined), {});
+});
+
+test('normalizeDeletedMap keeps only recent integer tombstones', () => {
+  const now = 1_700_000_000_000;
+  const result = normalizeDeletedMap(
+    { fresh: now - 1000, stale: now - 31 * 24 * 3600 * 1000, bad: 'x', nul: null },
+    now
+  );
+
+  assert.deepEqual(result, { fresh: now - 1000 });
 });
 
 test('normalizeSettings sanitizes invalid or missing icon sizes', () => {

@@ -178,6 +178,7 @@ export function createModalController({
         link.faviconUrl = getFaviconUrl(url, faviconSource);
         link.title = title;
         link.parent = group;
+        link.updatedAt = Date.now();
         normalizeGroupOrders(previousGroup, group);
       }
     } else {
@@ -190,7 +191,8 @@ export function createModalController({
         title,
         url,
         faviconSource: FAVICON_SOURCES.google,
-        faviconUrl: getFaviconUrl(url, FAVICON_SOURCES.google)
+        faviconUrl: getFaviconUrl(url, FAVICON_SOURCES.google),
+        updatedAt: Date.now()
       });
     }
 

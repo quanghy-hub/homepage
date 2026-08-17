@@ -4,6 +4,7 @@ export const STATE_VERSION = 1;
 export const DEFAULT_BACKUP_A_HOUR = 1;
 export const DEFAULT_BACKUP_A_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 export const APP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+export const DELETED_MAP_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
 export function normalizeBackupAHour(_value) {
   return DEFAULT_BACKUP_A_HOUR;
@@ -13,26 +14,14 @@ export function normalizeTimeZone(_value) {
   return DEFAULT_BACKUP_A_TIME_ZONE;
 }
 
-export function normalizeSession(session, index) {
-  const s = asObject(session);
-  return {
-    name: typeof s.name === 'string' ? s.name : `Session ${index + 1}`,
-    updatedAt: Number.isSafeInteger(s.updatedAt) ? s.updatedAt : null,
-    cookies: asArray(s.cookies),
-    localStorage: asObject(s.localStorage),
-    sessionStorage: asObject(s.sessionStorage)
-  };
-}
-
-export function normalizeSite(site) {
-  const s = asObject(site);
-  return {
-    id: typeof s.id === 'string' ? s.id : '',
-    origin: typeof s.origin === 'string' ? s.origin : '',
-    host: typeof s.host === 'string' ? s.host : '',
-    activeSlot: Number.isInteger(s.activeSlot) ? s.activeSlot : null,
-    sessions: asArray(s.sessions).map((session, index) => normalizeSession(session, index))
-  };
+export function normalizeDeletedMap(value, now = Date.now()) {
+  const out = {};
+  Object.entries(asObject(value)).forEach(([id, ts]) => {
+    if (APP_ID_PATTERN.test(id) && Number.isSafeInteger(ts) && ts > now - DELETED_MAP_TTL_MS) {
+      out[id] = ts;
+    }
+  });
+  return out;
 }
 
 export function normalizeProfile(value, fallbackGroups = {}) {
@@ -40,9 +29,6 @@ export function normalizeProfile(value, fallbackGroups = {}) {
   const normalized = {};
   const groupList = asArray(fallbackGroups.list);
 
-  if (Object.prototype.hasOwnProperty.call(profile, 'sites')) {
-    normalized.sites = asArray(profile.sites).map(normalizeSite);
-  }
   if (Object.prototype.hasOwnProperty.call(profile, 'settings')) {
     normalized.settings = asObject(profile.settings);
   }
@@ -93,6 +79,7 @@ export function normalizeStoredState(value, appId) {
       selected: typeof groups.selected === 'string' ? groups.selected : ''
     },
     profiles,
+    deletedMap: normalizeDeletedMap(state.deletedMap),
     revision: Number.isSafeInteger(state.revision) ? state.revision : 0,
     updatedAt: typeof state.updatedAt === 'string' ? state.updatedAt : null,
     backupAHour: normalizeBackupAHour(state.backupAHour),

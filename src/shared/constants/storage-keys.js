@@ -14,5 +14,6 @@ export const STORAGE_KEYS = {
   syncVerifyStatus: 'syncVerifyStatus',
   syncVerifyStatusType: 'syncVerifyStatusType',
   recentPage: 'recentPage',
-  faviconCache: 'faviconCache'
+  faviconCache: 'faviconCache',
+  deletedMap: 'deletedMap'
 };

@@ -69,6 +69,12 @@ export function createSyncController({
     }
   }
 
+  function describeSyncResult(updated) {
+    if (updated?.syncMerged) return 'B synced with newer cloud data';
+    if (updated?.syncConflict) return 'B had newer update; restored';
+    return 'B synced';
+  }
+
   async function pushToCloudflare(showStatus = true) {
     persistCurrentProfile();
     if (showStatus) setSyncStatus('Pushing to B...');
@@ -93,12 +99,10 @@ export function createSyncController({
     }
 
     if (showStatus) {
-      const label = updated?.syncMerged
-        ? 'B synced with newer cloud data'
-        : updated?.syncConflict
-          ? 'B had newer update; restored'
-          : 'B synced';
-      setSyncStatus(`✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
+      setSyncStatus(
+        `✓ ${describeSyncResult(updated)} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`,
+        'ok'
+      );
     }
     return updated;
   }
@@ -156,15 +160,15 @@ export function createSyncController({
 
     autoSyncTimer = setTimeout(async () => {
       autoSyncTimer = null;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        // Defer network traffic while the tab is hidden; reschedule instead.
+        scheduleAutoSync();
+        return;
+      }
       try {
         const updated = await pushToCloudflare(false);
-        const label = updated?.syncMerged
-          ? 'B synced with newer cloud data'
-          : updated?.syncConflict
-            ? 'B had newer update; restored'
-            : 'B synced';
         setSyncStatus(
-          `✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`,
+          `✓ ${describeSyncResult(updated)} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`,
           'ok'
         );
       } catch (err) {

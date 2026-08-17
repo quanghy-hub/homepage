@@ -1,8 +1,10 @@
 import { asArray, asObject, getLocalDateParts } from './utils.js';
 import {
   APP_ID_PATTERN,
+  DELETED_MAP_TTL_MS,
   DEFAULT_BACKUP_A_HOUR,
   STATE_VERSION,
+  normalizeDeletedMap,
   normalizeProfile,
   normalizeStoredState,
   normalizeTimeZone
@@ -10,6 +12,20 @@ import {
 
 export function getStateKey(appId) {
   return `apps/${appId}/state.v1.json`;
+}
+
+function mergeDeletedMap(existing, incoming) {
+  const out = normalizeDeletedMap(existing);
+  Object.entries(incoming).forEach(([id, ts]) => {
+    if (APP_ID_PATTERN.test(id) && Number.isSafeInteger(ts)) {
+      out[id] = Math.max(out[id] || 0, ts);
+    }
+  });
+  const pruneBefore = Date.now() - DELETED_MAP_TTL_MS;
+  Object.keys(out).forEach((id) => {
+    if (out[id] < pruneBefore) delete out[id];
+  });
+  return out;
 }
 
 export function getBackupKey(appId, slot) {
@@ -111,6 +127,7 @@ export async function writeState(bucket, appId, incoming) {
         }
       : existing.groups,
     profiles: { ...existing.profiles },
+    deletedMap: mergeDeletedMap(existing.deletedMap, asObject(payload.deletedMap)),
     revision: existing.revision + 1,
     updatedAt: new Date().toISOString(),
     backupAHour: DEFAULT_BACKUP_A_HOUR,

@@ -50,6 +50,42 @@ test('worker rejects writes based on a stale revision', async () => {
   );
 });
 
+test('worker merges deletedMap tombstones and prunes entries older than 30 days', async () => {
+  const bucket = new MemoryBucket();
+  const now = Date.now();
+
+  await writeState(bucket, 'homepage', {
+    baseRevision: 0,
+    groups: { list: ['A'] },
+    links: [{ _id: 'one', parent: 'A', url: 'https://example.com/', updatedAt: now }],
+    deletedMap: { one: now }
+  });
+
+  const state = await readState(bucket, 'homepage');
+  assert.equal(state.revision, 1);
+  assert.equal(state.links.length, 1);
+  assert.equal(state.deletedMap.one, now);
+
+  // Fresh incoming tombstones merge with the existing ones
+  const updated = await writeState(bucket, 'homepage', {
+    baseRevision: 1,
+    groups: { list: ['A'] },
+    deletedMap: { two: now + 5 }
+  });
+  assert.equal(updated.deletedMap.one, now);
+  assert.equal(updated.deletedMap.two, now + 5);
+
+  // Tombstones older than 30 days are pruned
+  const stale = Date.now() - 31 * 24 * 60 * 60 * 1000;
+  const pruned = await writeState(bucket, 'homepage', {
+    baseRevision: 2,
+    groups: { list: ['A'] },
+    deletedMap: { stale: stale }
+  });
+  assert.equal(pruned.deletedMap.stale, undefined);
+  assert.equal(pruned.deletedMap.one, now);
+});
+
 test('normalizeWorkerUrl formats URL correctly with https protocol', () => {
   assert.equal(normalizeWorkerUrl(''), '');
   assert.equal(normalizeWorkerUrl('  my-worker.workers.dev/  '), 'https://my-worker.workers.dev');

@@ -233,7 +233,8 @@ import { StateStore } from './state.js';
       links: store.links,
       groups: store.groups,
       settings: store.settings,
-      profileId: store.profileId
+      profileId: store.profileId,
+      deletedMap: store.deletedMap
     }),
     persistCurrentProfile: () => store.persistCurrentProfile(),
     refreshSettingsControls,

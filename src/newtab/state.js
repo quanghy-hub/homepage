@@ -7,6 +7,9 @@ import {
   normalizeProfile,
   saveAppData
 } from './storage.js';
+import { mergeDeletedMaps } from './sync-api.js';
+
+const FAVICON_CACHE_MAX_CHARS = 2_500_000; // keep storage.local writes well under quota
 
 export class StateStore {
   constructor() {
@@ -17,6 +20,7 @@ export class StateStore {
     this.profileId = DEFAULT_PROFILE_ID;
     this.selectedGroup = '';
     this.faviconCache = {};
+    this.deletedMap = {};
     this.suppressStorageSync = false;
     this.isEditMode = false;
     this.syncRevision = null;
@@ -43,6 +47,7 @@ export class StateStore {
       this.profiles = state.profiles;
       this.profileId = state.profileId;
       this.selectedGroup = state.selectedGroup;
+      this.deletedMap = state.deletedMap || {};
     });
   }
 
@@ -62,20 +67,38 @@ export class StateStore {
       groups: this.groups,
       settings: this.settings,
       profiles: this.profiles,
-      profileId: this.profileId
-    });
-    setTimeout(() => {
+      profileId: this.profileId,
+      deletedMap: this.deletedMap
+    }).finally(() => {
       this.suppressStorageSync = false;
-    }, 0);
+    });
     if (!options.skipAutoSync) {
       this.onScheduleSync();
     }
   }
 
   persistFaviconCache() {
-    chrome.storage.local.set({
-      [STORAGE_KEYS.faviconCache]: this.faviconCache
+    chrome.storage.local.set({ [STORAGE_KEYS.faviconCache]: this.faviconCache }, () => {
+      if (!chrome.runtime?.lastError) return;
+      // Quota exceeded (or another write error): evict the oldest entries and retry once.
+      this.pruneFaviconCache(FAVICON_CACHE_MAX_CHARS / 2);
+      chrome.storage.local.set({ [STORAGE_KEYS.faviconCache]: this.faviconCache }, () => {});
     });
+  }
+
+  pruneFaviconCache(maxChars = FAVICON_CACHE_MAX_CHARS) {
+    const cache = this.faviconCache || {};
+    const size = () => JSON.stringify(cache).length;
+    if (size() <= maxChars) return;
+
+    const entries = Object.entries(cache)
+      .filter(([, entry]) => entry && Number.isFinite(entry.updatedAt))
+      .sort((a, b) => a[1].updatedAt - b[1].updatedAt);
+
+    for (const [key] of entries) {
+      delete cache[key];
+      if (size() <= maxChars) break;
+    }
   }
 
   persistCurrentProfile() {
@@ -245,7 +268,17 @@ export class StateStore {
 
     this.groups.list = this.groups.list.filter((x) => x !== groupName);
     this.groups.pinned = this.groups.pinned.filter((x) => x !== groupName);
-    this.links = this.links.filter((l) => l.parent !== groupName);
+
+    const deletedAt = Date.now();
+    const remaining = [];
+    this.links.forEach((link) => {
+      if (link.parent === groupName) {
+        this.deletedMap[link._id] = deletedAt;
+      } else {
+        remaining.push(link);
+      }
+    });
+    this.links = remaining;
 
     if (this.selectedGroup === groupName) {
       this.selectedGroup = this.getFallbackSelected();
@@ -262,6 +295,7 @@ export class StateStore {
     const target = this.links.find((l) => l._id === linkId);
     if (!target) return;
 
+    this.deletedMap[linkId] = Date.now();
     this.links = this.links.filter((l) => l._id !== linkId);
     const sameGroup = this.getLinksForGroup(target.parent);
     sameGroup.forEach((item, idx) => {
@@ -274,8 +308,13 @@ export class StateStore {
   applyImportedState(imported) {
     if (!imported || typeof imported !== 'object') return;
 
+    this.deletedMap = mergeDeletedMaps(this.deletedMap, imported.deletedMap);
+
     if (Array.isArray(imported.links)) {
-      this.links = normalizeLinks(imported.links);
+      this.links = normalizeLinks(imported.links).filter((link) => {
+        const ts = this.deletedMap[link._id];
+        return !ts || (link.updatedAt && link.updatedAt > ts);
+      });
     }
 
     if (Array.isArray(imported.groups?.list)) {

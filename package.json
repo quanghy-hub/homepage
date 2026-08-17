@@ -1,18 +1,18 @@
 {
   "name": "home",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "A clean, highly customizable new tab page designed to organize your favorite web links. Easily group your quicklinks into custom categories, pin important groups for quick access, and keep your workspace clean and organized.",
-  "main": "index.js",
+  "private": true,
   "directories": {
     "test": "tests"
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "lint": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\"",
-    "lint:fix": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\" --fix",
+    "lint": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\"",
+    "lint:fix": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" --fix",
     "format": "prettier --write .",
     "prepare": "husky",
-    "build:zip": "mkdir -p /Users/best/github/extension && zip -r /Users/best/github/extension/homepage.zip src assets manifest.json README.md"
+    "build:zip": "node scripts/build-zip.mjs"
   },
   "lint-staged": {
     "*.{js,mjs}": [
@@ -20,6 +20,9 @@
       "prettier --write"
     ],
     "*.{css,html,json,md}": "prettier --write"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "repository": {
     "type": "git",

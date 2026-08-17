@@ -64,16 +64,12 @@ test('StateStore setSelectedGroup updates active group state', () => {
 test('bindEditModeActivation registers expected event listeners', () => {
   const { listeners } = createDomMock();
   let editState = false;
-  let entered = false;
-  let exited = false;
 
   bindEditModeActivation({
     enterEditMode: () => {
-      entered = true;
       editState = true;
     },
     exitEditMode: () => {
-      exited = true;
       editState = false;
     },
     isEditMode: () => editState,

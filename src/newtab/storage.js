@@ -21,6 +21,26 @@ export function normalizeSettings(settings) {
   };
 }
 
+export const DELETED_MAP_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+export function normalizeDeletedMap(value, now = Date.now()) {
+  const out = {};
+  Object.entries(value && typeof value === 'object' ? value : {}).forEach(([id, ts]) => {
+    if (id && Number.isSafeInteger(ts) && ts > now - DELETED_MAP_TTL_MS) out[id] = ts;
+  });
+  return out;
+}
+
+export function mergeDeletedMaps(...maps) {
+  const out = {};
+  maps.forEach((map) => {
+    Object.entries(map && typeof map === 'object' ? map : {}).forEach(([id, ts]) => {
+      if (id && Number.isSafeInteger(ts)) out[id] = Math.max(out[id] || 0, ts);
+    });
+  });
+  return out;
+}
+
 export function normalizeLinks(links) {
   if (!Array.isArray(links)) return [];
   return links
@@ -90,10 +110,12 @@ export function loadAppData(state) {
         STORAGE_KEYS.groups,
         STORAGE_KEYS.settings,
         STORAGE_KEYS.profiles,
-        STORAGE_KEYS.syncProfile
+        STORAGE_KEYS.syncProfile,
+        STORAGE_KEYS.deletedMap
       ],
       (result) => {
         state.profileId = result[STORAGE_KEYS.syncProfile] || DEFAULT_PROFILE_ID;
+        state.deletedMap = normalizeDeletedMap(result[STORAGE_KEYS.deletedMap]);
 
         if (result[STORAGE_KEYS.links] && result[STORAGE_KEYS.links].length > 0) {
           state.links = normalizeLinks(result[STORAGE_KEYS.links]);
@@ -130,15 +152,22 @@ export function saveAppData(state) {
   const profiles = Object.assign({}, state.profiles || {});
   profiles[state.profileId || DEFAULT_PROFILE_ID] = getProfileFromState(state);
 
-  chrome.storage.local.set({
-    [STORAGE_KEYS.links]: state.links,
-    [STORAGE_KEYS.groups]: {
-      list: state.groups.list
-    },
-    [STORAGE_KEYS.settings]: state.settings,
-    [STORAGE_KEYS.profiles]: profiles,
-    [STORAGE_KEYS.syncProfile]: state.profileId || DEFAULT_PROFILE_ID
+  return new Promise((resolve) => {
+    chrome.storage.local.set(
+      {
+        [STORAGE_KEYS.links]: state.links,
+        [STORAGE_KEYS.groups]: {
+          list: state.groups.list
+        },
+        [STORAGE_KEYS.settings]: state.settings,
+        [STORAGE_KEYS.profiles]: profiles,
+        [STORAGE_KEYS.syncProfile]: state.profileId || DEFAULT_PROFILE_ID,
+        [STORAGE_KEYS.deletedMap]: state.deletedMap || {}
+      },
+      () => {
+        state.profiles = profiles;
+        resolve();
+      }
+    );
   });
-
-  state.profiles = profiles;
 }

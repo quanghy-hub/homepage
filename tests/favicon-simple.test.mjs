@@ -56,6 +56,20 @@ test('keeps Google favicon URLs in the shared synchronized links payload', () =>
   assert.equal(exported.profileId, 'mobile');
 });
 
+test('buildExportData includes deletedMap tombstones in the sync payload', () => {
+  const state = {
+    groups: { list: ['A'], pinned: ['A'], selected: 'A' },
+    links: [],
+    profileId: 'macbook',
+    deletedMap: { linksabc123: 1234567890 }
+  };
+
+  const exported = buildExportData(state, 7);
+
+  assert.equal(exported.baseRevision, 7);
+  assert.equal(exported.deletedMap.linksabc123, 1234567890);
+});
+
 test('rejects invalid page URLs', () => {
   assert.deepEqual(getFaviconCandidates('not a URL'), []);
   assert.deepEqual(getFaviconCandidates('javascript:alert(1)'), []);

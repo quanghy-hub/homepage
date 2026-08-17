@@ -54,29 +54,71 @@ export function buildExportData(state, baseRevision = null) {
       pinned: state.groups.pinned,
       selected: state.groups.selected,
       settings: state.settings
-    }
+    },
+    deletedMap: state.deletedMap || {}
   };
 }
 
+/**
+ * Merges two deleted-link tombstones maps, keeping the newest timestamp per id.
+ */
+export function mergeDeletedMaps(...maps) {
+  const out = {};
+  maps.forEach((map) => {
+    Object.entries(map && typeof map === 'object' ? map : {}).forEach(([id, ts]) => {
+      if (id && Number.isSafeInteger(ts)) out[id] = Math.max(out[id] || 0, ts);
+    });
+  });
+  return out;
+}
+
+/**
+ * Merges the remote state with local changes before pushing.
+ *
+ * - New links/groups from either side are added (additive merge).
+ * - Shared links use last-write-wins by `updatedAt` so local edits are not lost.
+ * - Deletions recorded in either `deletedMap` (tombstones) win unless the live
+ *   copy on the other side was edited after the deletion.
+ */
 export function mergeLocalAddsIntoRemote(remote, localState) {
   const remoteLinks = Array.isArray(remote?.links) ? remote.links : [];
   const localLinks = Array.isArray(localState?.links) ? localState.links : [];
-  const mergedLinks = remoteLinks.slice();
-  const remoteLinkIds = new Set(remoteLinks.map((link) => link?._id).filter(Boolean));
+  const deletedMap = mergeDeletedMaps(remote?.deletedMap, localState?.deletedMap);
 
-  localLinks.forEach((link) => {
-    if (link?._id && !remoteLinkIds.has(link._id)) {
+  const isDeleted = (link) => {
+    const ts = deletedMap[link?._id];
+    return ts != null && (!link?.updatedAt || ts >= link.updatedAt);
+  };
+
+  const remoteById = new Map(
+    remoteLinks.filter((link) => link?._id && !isDeleted(link)).map((link) => [link._id, link])
+  );
+  const localById = new Map(
+    localLinks.filter((link) => link?._id && !isDeleted(link)).map((link) => [link._id, link])
+  );
+
+  const mergedLinks = [];
+  const mergedIds = new Set();
+
+  for (const [id, remoteLink] of remoteById) {
+    const localLink = localById.get(id);
+    const localUpdatedAt = localLink?.updatedAt || 0;
+    const remoteUpdatedAt = remoteLink.updatedAt || 0;
+    mergedLinks.push(localUpdatedAt > remoteUpdatedAt ? localLink : remoteLink);
+    mergedIds.add(id);
+  }
+
+  localById.forEach((link, id) => {
+    if (!mergedIds.has(id)) {
       mergedLinks.push(link);
-      remoteLinkIds.add(link._id);
+      mergedIds.add(id);
     }
   });
 
-  const remoteGroups = Array.isArray(remote?.groups?.list) ? remote.groups.list : [];
-  const localGroups = Array.isArray(localState?.groups?.list) ? localState.groups.list : [];
-  const mergedGroups = remoteGroups.slice();
+  const mergedGroups = Array.isArray(remote?.groups?.list) ? remote.groups.list.slice() : [];
   const groupNames = new Set(mergedGroups);
 
-  localGroups.forEach((groupName) => {
+  (Array.isArray(localState?.groups?.list) ? localState.groups.list : []).forEach((groupName) => {
     if (typeof groupName === 'string' && !groupNames.has(groupName)) {
       mergedGroups.push(groupName);
       groupNames.add(groupName);
@@ -96,7 +138,8 @@ export function mergeLocalAddsIntoRemote(remote, localState) {
     groups: {
       ...(localState?.groups || {}),
       list: mergedGroups
-    }
+    },
+    deletedMap
   };
 }
 

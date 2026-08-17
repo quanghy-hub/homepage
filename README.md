@@ -4,6 +4,8 @@ A clean, highly customizable new tab page designed to organize your favorite web
 
 This project is built using native HTML, CSS, and modern Javascript (ES Modules) for the frontend, combined with a Cloudflare Worker for backend synchronization via Cloudflare R2 storage.
 
+> **Note:** the `home-defaults.js` file contains the personal starter links/groups of the author. This project is intended for personal use; if you plan to publish it, replace those defaults first.
+
 ## Features
 
 - **Custom Grouping**: Group your quicklinks into custom tabs.
@@ -69,6 +71,7 @@ To enable syncing across multiple devices, deploy the Cloudflare Worker in the `
 ```text
 ├── assets/                  # Extension icons and graphics
 ├── manifest.json            # Manifest V3 configuration
+├── scripts/                 # Build tooling (cross-platform zip packaging)
 ├── tests/                   # Native Node.js unit tests
 ├── worker/                  # Cloudflare Worker codebase
 │   ├── src/                 # Worker logic, storage and normalizers
@@ -94,6 +97,21 @@ To run the unit tests:
 
 ```bash
 node --test tests/*.test.mjs
+```
+
+## Development Tooling (optional)
+
+Linting, formatting, and git hooks use ESLint, Prettier, and Husky. Install them once at the repository root:
+
+```bash
+npm install
+npm run lint
+```
+
+To package the extension as a `homepage.zip` (works on Windows, macOS, and Linux):
+
+```bash
+npm run build:zip
 ```
 
 ---
