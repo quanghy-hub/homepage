@@ -24,6 +24,26 @@ export function normalizeDeletedMap(value, now = Date.now()) {
   return out;
 }
 
+/**
+ * Tombstones keyed by user-defined group names, so keys are validated as
+ * bounded non-empty strings instead of the stricter APP_ID_PATTERN.
+ */
+export function normalizeDeletedNamesMap(value, now = Date.now()) {
+  const out = {};
+  Object.entries(asObject(value)).forEach(([name, ts]) => {
+    if (
+      typeof name === 'string' &&
+      name.length > 0 &&
+      name.length <= 200 &&
+      Number.isSafeInteger(ts) &&
+      ts > now - DELETED_MAP_TTL_MS
+    ) {
+      out[name] = ts;
+    }
+  });
+  return out;
+}
+
 export function normalizeProfile(value, fallbackGroups = {}) {
   const profile = asObject(value);
   const normalized = {};
@@ -80,6 +100,7 @@ export function normalizeStoredState(value, appId) {
     },
     profiles,
     deletedMap: normalizeDeletedMap(state.deletedMap),
+    deletedGroupsMap: normalizeDeletedNamesMap(state.deletedGroupsMap),
     revision: Number.isSafeInteger(state.revision) ? state.revision : 0,
     updatedAt: typeof state.updatedAt === 'string' ? state.updatedAt : null,
     backupAHour: normalizeBackupAHour(state.backupAHour),

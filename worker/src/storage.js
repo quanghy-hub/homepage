@@ -5,6 +5,7 @@ import {
   DEFAULT_BACKUP_A_HOUR,
   STATE_VERSION,
   normalizeDeletedMap,
+  normalizeDeletedNamesMap,
   normalizeProfile,
   normalizeStoredState,
   normalizeTimeZone
@@ -24,6 +25,20 @@ function mergeDeletedMap(existing, incoming) {
   const pruneBefore = Date.now() - DELETED_MAP_TTL_MS;
   Object.keys(out).forEach((id) => {
     if (out[id] < pruneBefore) delete out[id];
+  });
+  return out;
+}
+
+function mergeDeletedNamesMap(existing, incoming) {
+  const out = normalizeDeletedNamesMap(existing);
+  Object.entries(asObject(incoming)).forEach(([name, ts]) => {
+    if (typeof name === 'string' && name && Number.isSafeInteger(ts)) {
+      out[name] = Math.max(out[name] || 0, ts);
+    }
+  });
+  const pruneBefore = Date.now() - DELETED_MAP_TTL_MS;
+  Object.keys(out).forEach((name) => {
+    if (out[name] < pruneBefore) delete out[name];
   });
   return out;
 }
@@ -128,6 +143,10 @@ export async function writeState(bucket, appId, incoming) {
       : existing.groups,
     profiles: { ...existing.profiles },
     deletedMap: mergeDeletedMap(existing.deletedMap, asObject(payload.deletedMap)),
+    deletedGroupsMap: mergeDeletedNamesMap(
+      existing.deletedGroupsMap,
+      asObject(payload.deletedGroupsMap)
+    ),
     revision: existing.revision + 1,
     updatedAt: new Date().toISOString(),
     backupAHour: DEFAULT_BACKUP_A_HOUR,

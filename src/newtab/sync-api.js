@@ -55,7 +55,8 @@ export function buildExportData(state, baseRevision = null) {
       selected: state.groups.selected,
       settings: state.settings
     },
-    deletedMap: state.deletedMap || {}
+    deletedMap: state.deletedMap || {},
+    deletedGroupsMap: state.deletedGroupsMap || {}
   };
 }
 
@@ -84,11 +85,14 @@ export function mergeLocalAddsIntoRemote(remote, localState) {
   const remoteLinks = Array.isArray(remote?.links) ? remote.links : [];
   const localLinks = Array.isArray(localState?.links) ? localState.links : [];
   const deletedMap = mergeDeletedMaps(remote?.deletedMap, localState?.deletedMap);
+  const deletedGroupsMap = mergeDeletedMaps(remote?.deletedGroupsMap, localState?.deletedGroupsMap);
 
   const isDeleted = (link) => {
     const ts = deletedMap[link?._id];
     return ts != null && (!link?.updatedAt || ts >= link.updatedAt);
   };
+
+  const isGroupDeleted = (groupName) => Boolean(deletedGroupsMap[groupName]);
 
   const remoteById = new Map(
     remoteLinks.filter((link) => link?._id && !isDeleted(link)).map((link) => [link._id, link])
@@ -115,18 +119,25 @@ export function mergeLocalAddsIntoRemote(remote, localState) {
     }
   });
 
-  const mergedGroups = Array.isArray(remote?.groups?.list) ? remote.groups.list.slice() : [];
+  // Tombstoned groups (deleted/renamed on any device) are dropped up front.
+  const mergedGroups = (Array.isArray(remote?.groups?.list) ? remote.groups.list : []).filter(
+    (groupName) => !isGroupDeleted(groupName)
+  );
   const groupNames = new Set(mergedGroups);
 
   (Array.isArray(localState?.groups?.list) ? localState.groups.list : []).forEach((groupName) => {
-    if (typeof groupName === 'string' && !groupNames.has(groupName)) {
+    if (typeof groupName === 'string' && !groupNames.has(groupName) && !isGroupDeleted(groupName)) {
       mergedGroups.push(groupName);
       groupNames.add(groupName);
     }
   });
 
   mergedLinks.forEach((link) => {
-    if (typeof link?.parent === 'string' && !groupNames.has(link.parent)) {
+    if (
+      typeof link?.parent === 'string' &&
+      !groupNames.has(link.parent) &&
+      !isGroupDeleted(link.parent)
+    ) {
       mergedGroups.push(link.parent);
       groupNames.add(link.parent);
     }
@@ -139,7 +150,8 @@ export function mergeLocalAddsIntoRemote(remote, localState) {
       ...(localState?.groups || {}),
       list: mergedGroups
     },
-    deletedMap
+    deletedMap,
+    deletedGroupsMap
   };
 }
 

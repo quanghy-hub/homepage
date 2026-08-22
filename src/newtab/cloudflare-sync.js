@@ -1,7 +1,9 @@
 import { DEFAULT_PROFILE_ID } from '../shared/constants/home-defaults.js';
 import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
 
-export const DEFAULT_WORKER_URL = 'https://extension.quavav15-6.workers.dev';
+// Personal defaults live in an optional git-ignored file so they never leak
+// into a published build. Copy worker-config.local.example.js to enable them.
+export const DEFAULT_WORKER_URL = '';
 export const PROFILE_IDS = ['macbook', 'mobile'];
 export const DEFAULT_SYNC_DELAY_SECONDS = 5;
 const MIN_SYNC_DELAY_SECONDS = 1;
@@ -106,7 +108,17 @@ export function bindSyncCredentialInputs(dom, handlers = {}) {
   dom.syncDelayInput?.addEventListener('blur', saveSyncDelay);
 }
 
-export function loadSavedSyncCredentials(dom) {
+async function loadLocalDefaultWorkerUrl() {
+  try {
+    const config = await import('../shared/constants/worker-config.local.js');
+    return typeof config.DEFAULT_WORKER_URL === 'string' ? config.DEFAULT_WORKER_URL.trim() : '';
+  } catch {
+    return ''; // Optional config absent — start with an empty Worker URL.
+  }
+}
+
+export async function loadSavedSyncCredentials(dom) {
+  const localDefaultWorkerUrl = await loadLocalDefaultWorkerUrl();
   return new Promise((resolve) => {
     chrome.storage.local.get(
       [
@@ -116,7 +128,7 @@ export function loadSavedSyncCredentials(dom) {
         STORAGE_KEYS.syncDelaySeconds
       ],
       (result) => {
-        dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || DEFAULT_WORKER_URL;
+        dom.syncWorkerUrlInput.value = result[STORAGE_KEYS.syncWorkerUrl] || localDefaultWorkerUrl;
         dom.syncApiCodeInput.value = result[STORAGE_KEYS.syncApiCode] || '';
         dom.syncProfileSelect.value = PROFILE_IDS.includes(result[STORAGE_KEYS.syncProfile])
           ? result[STORAGE_KEYS.syncProfile]

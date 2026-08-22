@@ -3,3 +3,4 @@ node_modules/
 worker/.wrangler/
 dist/
 homepage.zip
+src/shared/constants/worker-config.local.js

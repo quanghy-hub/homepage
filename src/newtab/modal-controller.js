@@ -1,3 +1,4 @@
+import { createId } from '../shared/utils/id.js';
 import {
   autoTitle,
   FAVICON_SOURCES,
@@ -15,6 +16,7 @@ export function createModalController({
   getLinksForGroup,
   getSelectedGroup,
   normalizeGroupOrders,
+  recordDeletedGroups,
   renameGroupInProfiles,
   render,
   saveData,
@@ -133,6 +135,7 @@ export function createModalController({
     if (groups.list.includes(name) && name !== editingGroupName) return;
 
     if (modalMode === 'edit-group' && editingGroupName) {
+      const now = Date.now();
       groups.list = groups.list.map((groupName) =>
         groupName === editingGroupName ? name : groupName
       );
@@ -140,8 +143,15 @@ export function createModalController({
         groupName === editingGroupName ? name : groupName
       );
       links.forEach((link) => {
-        if (link.parent === editingGroupName) link.parent = name;
+        if (link.parent === editingGroupName) {
+          link.parent = name;
+          // Bump updatedAt so the rename wins the last-write-wins merge and
+          // the old group copy on the cloud does not resurrect the links.
+          link.updatedAt = now;
+        }
       });
+      // Tombstone the old group name so remote devices drop it on merge.
+      recordDeletedGroups?.(editingGroupName);
       if (getSelectedGroup() === editingGroupName) setSelectedGroup(name);
       groups.selected = getSelectedGroup();
       renameGroupInProfiles(editingGroupName, name);
@@ -183,7 +193,7 @@ export function createModalController({
       }
     } else {
       const groupLinks = getLinksForGroup(group);
-      const newId = 'links' + Math.random().toString(36).slice(2, 10);
+      const newId = createId('links');
       links.push({
         _id: newId,
         order: groupLinks.length,

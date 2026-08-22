@@ -21,6 +21,7 @@ export class StateStore {
     this.selectedGroup = '';
     this.faviconCache = {};
     this.deletedMap = {};
+    this.deletedGroupsMap = {};
     this.suppressStorageSync = false;
     this.isEditMode = false;
     this.syncRevision = null;
@@ -48,6 +49,7 @@ export class StateStore {
       this.profileId = state.profileId;
       this.selectedGroup = state.selectedGroup;
       this.deletedMap = state.deletedMap || {};
+      this.deletedGroupsMap = state.deletedGroupsMap || {};
     });
   }
 
@@ -68,7 +70,8 @@ export class StateStore {
       settings: this.settings,
       profiles: this.profiles,
       profileId: this.profileId,
-      deletedMap: this.deletedMap
+      deletedMap: this.deletedMap,
+      deletedGroupsMap: this.deletedGroupsMap
     }).finally(() => {
       this.suppressStorageSync = false;
     });
@@ -189,6 +192,19 @@ export class StateStore {
     });
   }
 
+  /**
+   * Records group-name tombstones so two-way sync drops the names instead of
+   * resurrecting them (deletion and rename both funnel through here).
+   */
+  recordDeletedGroups(...groupNames) {
+    const now = Date.now();
+    groupNames.filter(Boolean).forEach((groupName) => {
+      if (!this.deletedGroupsMap[groupName]) {
+        this.deletedGroupsMap[groupName] = now;
+      }
+    });
+  }
+
   setEditMode(nextValue) {
     this.isEditMode = !!nextValue;
     document.body.classList.toggle('edit-mode', this.isEditMode);
@@ -200,6 +216,10 @@ export class StateStore {
     if (!dragged || !target) return;
     const sourceGroup = dragged.parent;
 
+    if (targetGroup && dragged.parent !== targetGroup) {
+      // Moving across groups must bump updatedAt so LWW sync keeps the move.
+      dragged.updatedAt = Date.now();
+    }
     dragged.parent = targetGroup || target.parent;
 
     const groupLinks = this.getLinksForGroup(dragged.parent);
@@ -266,10 +286,11 @@ export class StateStore {
   deleteGroup(groupName) {
     if (!groupName || this.groups.list.length <= 2) return;
 
+    const deletedAt = Date.now();
+    this.recordDeletedGroups(groupName);
     this.groups.list = this.groups.list.filter((x) => x !== groupName);
     this.groups.pinned = this.groups.pinned.filter((x) => x !== groupName);
 
-    const deletedAt = Date.now();
     const remaining = [];
     this.links.forEach((link) => {
       if (link.parent === groupName) {
@@ -309,6 +330,7 @@ export class StateStore {
     if (!imported || typeof imported !== 'object') return;
 
     this.deletedMap = mergeDeletedMaps(this.deletedMap, imported.deletedMap);
+    this.deletedGroupsMap = mergeDeletedMaps(this.deletedGroupsMap, imported.deletedGroupsMap);
 
     if (Array.isArray(imported.links)) {
       this.links = normalizeLinks(imported.links).filter((link) => {
@@ -317,8 +339,11 @@ export class StateStore {
       });
     }
 
+    const isGroupDeleted = (groupName) => Boolean(this.deletedGroupsMap[groupName]);
+
     if (Array.isArray(imported.groups?.list)) {
-      this.groups.list = imported.groups.list;
+      // Drop groups tombstoned on any device so deletions/renames stick.
+      this.groups.list = imported.groups.list.filter((name) => !isGroupDeleted(name));
     }
 
     this.profiles = Object.assign({}, this.profiles, imported.profiles || {});

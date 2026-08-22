@@ -117,6 +117,7 @@ import { StateStore } from './state.js';
     getLinksForGroup: (groupName) => store.getLinksForGroup(groupName),
     getSelectedGroup: () => store.selectedGroup,
     normalizeGroupOrders: (...groupNames) => store.normalizeGroupOrders(...groupNames),
+    recordDeletedGroups: (...groupNames) => store.recordDeletedGroups(...groupNames),
     renameGroupInProfiles: (oldName, newName) => store.renameGroupInProfiles(oldName, newName),
     render,
     saveData: (options) => store.saveData(options),
@@ -232,7 +233,8 @@ import { StateStore } from './state.js';
       groups: store.groups,
       settings: store.settings,
       profileId: store.profileId,
-      deletedMap: store.deletedMap
+      deletedMap: store.deletedMap,
+      deletedGroupsMap: store.deletedGroupsMap
     }),
     persistCurrentProfile: () => store.persistCurrentProfile(),
     refreshSettingsControls,

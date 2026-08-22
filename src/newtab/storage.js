@@ -111,11 +111,13 @@ export function loadAppData(state) {
         STORAGE_KEYS.settings,
         STORAGE_KEYS.profiles,
         STORAGE_KEYS.syncProfile,
-        STORAGE_KEYS.deletedMap
+        STORAGE_KEYS.deletedMap,
+        STORAGE_KEYS.deletedGroupsMap
       ],
       (result) => {
         state.profileId = result[STORAGE_KEYS.syncProfile] || DEFAULT_PROFILE_ID;
         state.deletedMap = normalizeDeletedMap(result[STORAGE_KEYS.deletedMap]);
+        state.deletedGroupsMap = normalizeDeletedMap(result[STORAGE_KEYS.deletedGroupsMap]);
 
         if (result[STORAGE_KEYS.links] && result[STORAGE_KEYS.links].length > 0) {
           state.links = normalizeLinks(result[STORAGE_KEYS.links]);
@@ -162,7 +164,8 @@ export function saveAppData(state) {
         [STORAGE_KEYS.settings]: state.settings,
         [STORAGE_KEYS.profiles]: profiles,
         [STORAGE_KEYS.syncProfile]: state.profileId || DEFAULT_PROFILE_ID,
-        [STORAGE_KEYS.deletedMap]: state.deletedMap || {}
+        [STORAGE_KEYS.deletedMap]: state.deletedMap || {},
+        [STORAGE_KEYS.deletedGroupsMap]: state.deletedGroupsMap || {}
       },
       () => {
         state.profiles = profiles;

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Homepage",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Custom new tab page with grouped quicklinks",
   "incognito": "split",
   "chrome_url_overrides": {
