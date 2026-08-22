@@ -15,9 +15,16 @@ function normalizeDelaySeconds(value) {
   return Math.min(MAX_SYNC_DELAY_SECONDS, Math.max(MIN_SYNC_DELAY_SECONDS, Math.round(parsed)));
 }
 
+// Status text is persisted so a freshly opened new tab can show the last
+// sync outcome. Skip identical writes (e.g. repeated background pulls) to
+// keep chrome.storage.local write churn low.
+const lastPersistedStatus = { sync: null, verify: null };
+
 export function setSyncStatus(dom, msg, type = '') {
   dom.syncStatus.textContent = msg;
   dom.syncStatus.className = 'sync-status' + (type ? ' ' + type : '');
+  if (lastPersistedStatus.sync === msg + '\u0000' + type) return;
+  lastPersistedStatus.sync = msg + '\u0000' + type;
   chrome.storage.local.set({
     [STORAGE_KEYS.syncStatus]: msg,
     [STORAGE_KEYS.syncStatusType]: type
@@ -28,6 +35,8 @@ export function setVerifyStatus(dom, msg, type = '') {
   if (!dom.syncVerifyStatus) return;
   dom.syncVerifyStatus.textContent = msg;
   dom.syncVerifyStatus.className = 'sync-status' + (type ? ' ' + type : '');
+  if (lastPersistedStatus.verify === msg + '\u0000' + type) return;
+  lastPersistedStatus.verify = msg + '\u0000' + type;
   chrome.storage.local.set({
     [STORAGE_KEYS.syncVerifyStatus]: msg,
     [STORAGE_KEYS.syncVerifyStatusType]: type

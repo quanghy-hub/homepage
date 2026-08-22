@@ -10,6 +10,8 @@ import {
 import { mergeDeletedMaps } from './sync-api.js';
 
 const FAVICON_CACHE_MAX_CHARS = 2_500_000; // keep storage.local writes well under quota
+// The UI relies on at least one pinned + one unpinned group to stay navigable.
+const MIN_GROUP_COUNT = 2;
 
 export class StateStore {
   constructor() {
@@ -284,7 +286,7 @@ export class StateStore {
   }
 
   deleteGroup(groupName) {
-    if (!groupName || this.groups.list.length <= 2) return;
+    if (!groupName || this.groups.list.length <= MIN_GROUP_COUNT) return;
 
     const deletedAt = Date.now();
     this.recordDeletedGroups(groupName);

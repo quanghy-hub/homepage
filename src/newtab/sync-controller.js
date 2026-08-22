@@ -32,11 +32,15 @@ export function createSyncController({
   switchProfile
 }) {
   let autoSyncTimer = null;
-  let autoRestoreTimer = null;
   let isPushing = false;
   let isRestoring = false;
   let isBootstrapping = false;
   let syncReady = false;
+
+  // Auto-restore pulls are triggered by visibility changes instead of a fixed
+  // interval: no network traffic while the tab stays hidden or closed.
+  let lastAutoRestoreAt = 0;
+  let autoRestoreErrorVisible = false;
 
   function setSyncStatus(msg, type = '') {
     updateSyncStatus(dom, msg, type);
@@ -188,7 +192,9 @@ export function createSyncController({
       const config = getSyncSettings(dom);
       const remote = await pullCloudflareState(config.workerUrl, config.apiCode);
 
-      if (dom.syncStatus && dom.syncStatus.textContent.startsWith('✗ Auto restore error')) {
+      // A previous auto-restore error is now stale — clear it.
+      if (autoRestoreErrorVisible) {
+        autoRestoreErrorVisible = false;
         setSyncStatus('');
       }
 
@@ -256,23 +262,39 @@ export function createSyncController({
     }
   }
 
-  function startAutoRestore() {
-    clearInterval(autoRestoreTimer);
-    const config = getSyncSettings(dom);
-    if (!config.workerUrl || !config.apiCode) {
-      return;
+  function autoRestoreFailure(err) {
+    if (err.message === 'Failed to fetch' || err.message.toLowerCase().includes('network')) {
+      return; // Transient network issues stay silent.
     }
+    autoRestoreErrorVisible = true;
+    setSyncStatus('✗ Auto restore error: ' + err.message, 'err');
+  }
 
-    const intervalMs = Math.max(1, config.delaySeconds || 5) * 1000;
-    autoRestoreTimer = setInterval(() => {
-      if (document.visibilityState === 'hidden') return;
-      restoreLatestFromB(false).catch((err) => {
-        if (err.message === 'Failed to fetch') {
-          return;
-        }
-        setSyncStatus('✗ Auto restore error: ' + err.message, 'err');
-      });
-    }, intervalMs);
+  function maybeAutoRestore() {
+    const config = getSyncSettings(dom);
+    if (!config.workerUrl || !config.apiCode) return;
+    if (document.visibilityState === 'hidden') return;
+
+    // delaySeconds doubles as the minimum spacing between background pulls.
+    const minIntervalMs = Math.max(1, config.delaySeconds || 5) * 1000;
+    if (Date.now() - lastAutoRestoreAt < minIntervalMs) return;
+    lastAutoRestoreAt = Date.now();
+
+    restoreLatestFromB(false).catch(autoRestoreFailure);
+  }
+
+  function onVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      maybeAutoRestore();
+    }
+  }
+
+  function startAutoRestore() {
+    const config = getSyncSettings(dom);
+    if (!config.workerUrl || !config.apiCode) return;
+
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('visibilitychange', onVisibilityChange);
   }
 
   function bind() {
