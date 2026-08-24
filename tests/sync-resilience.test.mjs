@@ -252,3 +252,176 @@ test('bootstrapCloud handles network failure cleanly without throwing', async ()
   globalThis.fetch = originalFetch;
   delete globalThis.chrome;
 });
+
+/* ========== UN-PUSHED EDIT PROTECTION (syncPending) ========== */
+
+function mockChromeStorage(initial = {}) {
+  const backing = { ...initial };
+  const setCalls = [];
+  globalThis.chrome = {
+    storage: {
+      local: {
+        get(keys, cb) {
+          const list = Array.isArray(keys) ? keys : [keys];
+          const result = {};
+          list.forEach((key) => {
+            if (key in backing) result[key] = backing[key];
+          });
+          setTimeout(() => cb(result), 0);
+        },
+        set(obj) {
+          setCalls.push(obj);
+          Object.assign(backing, obj);
+        }
+      }
+    }
+  };
+  return { backing, setCalls };
+}
+
+function mockSyncFetch(remoteState, options = {}) {
+  const calls = [];
+  const jsonResponse = (obj) => ({ ok: true, status: 200, json: async () => obj });
+  globalThis.fetch = async (_url, opts = {}) => {
+    const method = opts.method || 'GET';
+    calls.push({ method, body: opts.body ? JSON.parse(opts.body) : null });
+    if (method === 'GET') return jsonResponse(remoteState);
+    if (options.interceptPut) return options.interceptPut(calls);
+    return jsonResponse({ ...remoteState, revision: remoteState.revision + 1 });
+  };
+  return calls;
+}
+
+const LOCAL_STATE = {
+  links: [{ _id: 'local-1', parent: 'G1', url: 'https://local.app' }],
+  groups: { list: ['G1'], pinned: [], selected: '' },
+  settings: {},
+  profileId: 'macbook',
+  deletedMap: {},
+  deletedGroupsMap: {}
+};
+
+const REMOTE_STATE = {
+  revision: 7,
+  links: [{ _id: 'remote-1', parent: 'G1', url: 'https://remote.app' }],
+  groups: { list: ['G1'], pinned: [], selected: '' },
+  profiles: {},
+  deletedMap: {},
+  deletedGroupsMap: {}
+};
+
+function buildController(dom, hooks = {}) {
+  let revision = hooks.initialRevision ?? null;
+  return createSyncController({
+    applyImportedState: hooks.applyImportedState || (() => {}),
+    dom,
+    getRevision: () => revision,
+    getState: () => LOCAL_STATE,
+    persistCurrentProfile: () => {},
+    refreshSettingsControls: () => {},
+    render: () => {},
+    saveData: () => {},
+    setRevision: (next) => {
+      revision = next;
+      hooks.onSetRevision?.(next);
+    },
+    switchProfile: () => {}
+  });
+}
+
+test('bootstrapCloud flushes un-pushed local edits to the cloud before pulling', async () => {
+  const { setCalls } = mockChromeStorage({ syncPending: true });
+  const calls = mockSyncFetch(REMOTE_STATE);
+
+  const appliedSnapshots = [];
+  const controller = buildController(
+    {
+      syncWorkerUrlInput: { value: 'https://worker.dev' },
+      syncApiCodeInput: { value: 'secret' },
+      syncStatus: { textContent: '', className: '' }
+    },
+    { applyImportedState: (imported) => appliedSnapshots.push(imported) }
+  );
+
+  assert.equal(await controller.loadSavedPending(), true);
+  assert.equal(await controller.bootstrapCloud({ force: true }), true);
+
+  // The flush must PUT a merge of local + remote links before any restore.
+  const putCall = calls.find((call) => call.method === 'PUT');
+  assert.ok(putCall, 'expected a push during bootstrap');
+  const pushedIds = putCall.body.links.map((link) => link._id);
+  assert.ok(pushedIds.includes('local-1'), 'local edit must reach the cloud');
+  assert.ok(pushedIds.includes('remote-1'), 'remote links must be preserved');
+
+  // Confirmed push clears the persisted pending flag.
+  const pendingWrites = setCalls.filter((entry) => 'syncPending' in entry);
+  assert.equal(pendingWrites.at(-1).syncPending, false);
+
+  // After the flush the remote snapshot is not older than ours — no clobber.
+  assert.equal(appliedSnapshots.length, 1);
+
+  delete globalThis.fetch;
+  delete globalThis.chrome;
+});
+
+test('bootstrapCloud keeps the newer local revision when the cloud is behind', async () => {
+  mockChromeStorage();
+  mockSyncFetch({ ...REMOTE_STATE, revision: 2 });
+
+  const revisionsSet = [];
+  const controller = buildController(
+    {
+      syncWorkerUrlInput: { value: 'https://worker.dev' },
+      syncApiCodeInput: { value: 'secret' },
+      syncStatus: { textContent: '', className: '' }
+    },
+    { initialRevision: 10, onSetRevision: (revision) => revisionsSet.push(revision) }
+  );
+
+  assert.equal(await controller.bootstrapCloud({ force: true }), true);
+  assert.deepEqual(revisionsSet, [], 'must never adopt an older remote revision');
+
+  delete globalThis.fetch;
+  delete globalThis.chrome;
+});
+
+test('edits landing mid-push keep the pending flag so nothing is lost', async () => {
+  const { setCalls } = mockChromeStorage({ syncPending: true });
+  let resolvePut;
+  const calls = mockSyncFetch(REMOTE_STATE, {
+    interceptPut: () =>
+      new Promise((resolve) => {
+        resolvePut = resolve;
+      })
+  });
+
+  const dom = {
+    syncWorkerUrlInput: { value: 'https://worker.dev' },
+    syncApiCodeInput: { value: 'secret' },
+    syncStatus: { textContent: '', className: '' }
+  };
+  const controller = buildController(dom);
+
+  assert.equal(await controller.loadSavedPending(), true);
+  const bootPromise = controller.bootstrapCloud({ force: true });
+
+  while (!resolvePut) await new Promise((resolve) => setTimeout(resolve, 5));
+  // Simulates an edit whose saveData fires onScheduleSync while pushing.
+  controller.scheduleAutoSync();
+  resolvePut({
+    ok: true,
+    status: 200,
+    json: async () => ({ ...REMOTE_STATE, revision: REMOTE_STATE.revision + 1 })
+  });
+
+  assert.equal(await bootPromise, true);
+  assert.ok(calls.some((call) => call.method === 'PUT'));
+  assert.equal(
+    setCalls.filter((entry) => 'syncPending' in entry).length,
+    0,
+    'pending flag must stay set until the newer edit is confirmed pushed'
+  );
+
+  delete globalThis.fetch;
+  delete globalThis.chrome;
+});

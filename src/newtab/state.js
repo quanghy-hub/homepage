@@ -8,6 +8,7 @@ import {
   saveAppData
 } from './storage.js';
 import { mergeDeletedMaps } from './sync-api.js';
+import { saveSyncPending } from './cloudflare-sync.js';
 
 const FAVICON_CACHE_MAX_CHARS = 2_500_000; // keep storage.local writes well under quota
 // The UI relies on at least one pinned + one unpinned group to stay navigable.
@@ -78,6 +79,9 @@ export class StateStore {
       this.suppressStorageSync = false;
     });
     if (!options.skipAutoSync) {
+      // Remember that the cloud may be stale until a push confirms otherwise,
+      // so a reload/kill before the debounce fires cannot silently lose edits.
+      saveSyncPending(true);
       this.onScheduleSync();
     }
   }

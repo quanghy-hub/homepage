@@ -340,6 +340,7 @@ import { StateStore } from './state.js';
     store.loadFaviconCache(),
     syncController.loadSavedRevision(),
     syncController.loadSavedReady(),
+    syncController.loadSavedPending(),
     syncController.loadSavedCredentials(),
     syncController.loadSavedStatuses()
   ]).then(([, , savedRevision]) => {

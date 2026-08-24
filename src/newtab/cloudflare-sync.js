@@ -177,3 +177,18 @@ export function loadSyncReady() {
 export function saveSyncReady(isReady) {
   chrome.storage.local.set({ [STORAGE_KEYS.syncReady]: isReady === true });
 }
+
+// Tracks local edits that may not have reached the cloud yet (push debounced,
+// tab hidden, browser killed...). Persisted so an un-pushed edit survives a
+// page reload and is flushed before any pull can overwrite it.
+export function loadSyncPending() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([STORAGE_KEYS.syncPending], (result) => {
+      resolve(result[STORAGE_KEYS.syncPending] === true);
+    });
+  });
+}
+
+export function saveSyncPending(isPending) {
+  chrome.storage.local.set({ [STORAGE_KEYS.syncPending]: isPending === true });
+}

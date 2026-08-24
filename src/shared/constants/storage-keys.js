@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   syncDelaySeconds: 'syncDelaySeconds',
   syncReady: 'syncReady',
   syncRevision: 'syncRevision',
+  syncPending: 'syncPending',
   syncStatus: 'syncStatus',
   syncStatusType: 'syncStatusType',
   syncVerifyStatus: 'syncVerifyStatus',
