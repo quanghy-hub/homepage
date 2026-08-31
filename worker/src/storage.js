@@ -128,25 +128,44 @@ export async function writeState(bucket, appId, incoming) {
     throw err;
   }
 
+  const nextDeletedMap = mergeDeletedMap(existing.deletedMap, asObject(payload.deletedMap));
+  const nextDeletedGroupsMap = mergeDeletedNamesMap(
+    existing.deletedGroupsMap,
+    asObject(payload.deletedGroupsMap)
+  );
+
+  // Merge groups.list additively (union) so a stale client list does not
+  // overwrite groups created on another device. Tombstoned names are dropped.
+  let nextGroups;
+  if (Object.prototype.hasOwnProperty.call(payload, 'groups')) {
+    const incomingList = asArray(groups.list);
+    const existingList = asArray(existing.groups.list);
+    const mergedSet = new Set(existingList.filter((name) => !nextDeletedGroupsMap[name]));
+    incomingList.forEach((name) => {
+      if (typeof name === 'string' && name && !nextDeletedGroupsMap[name] && !mergedSet.has(name)) {
+        mergedSet.add(name);
+      }
+    });
+    // Also preserve any existing group that is not tombstoned even if payload omitted it
+    nextGroups = {
+      list: [...mergedSet],
+      pinned: asArray(groups.pinned),
+      selected: typeof groups.selected === 'string' ? groups.selected : ''
+    };
+  } else {
+    nextGroups = existing.groups;
+  }
+
   const next = {
     version: STATE_VERSION,
     appId,
     links: Object.prototype.hasOwnProperty.call(payload, 'links')
       ? asArray(payload.links)
       : existing.links,
-    groups: Object.prototype.hasOwnProperty.call(payload, 'groups')
-      ? {
-          list: asArray(groups.list),
-          pinned: asArray(groups.pinned),
-          selected: typeof groups.selected === 'string' ? groups.selected : ''
-        }
-      : existing.groups,
+    groups: nextGroups,
     profiles: { ...existing.profiles },
-    deletedMap: mergeDeletedMap(existing.deletedMap, asObject(payload.deletedMap)),
-    deletedGroupsMap: mergeDeletedNamesMap(
-      existing.deletedGroupsMap,
-      asObject(payload.deletedGroupsMap)
-    ),
+    deletedMap: nextDeletedMap,
+    deletedGroupsMap: nextDeletedGroupsMap,
     revision: existing.revision + 1,
     updatedAt: new Date().toISOString(),
     backupAHour: DEFAULT_BACKUP_A_HOUR,

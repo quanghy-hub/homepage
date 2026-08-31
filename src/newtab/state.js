@@ -7,7 +7,7 @@ import {
   normalizeProfile,
   saveAppData
 } from './storage.js';
-import { mergeDeletedMaps } from './sync-api.js';
+import { mergeDeletedMaps, mergeLocalAddsIntoRemote } from './sync-api.js';
 import { saveSyncPending } from './cloudflare-sync.js';
 
 const FAVICON_CACHE_MAX_CHARS = 2_500_000; // keep storage.local writes well under quota
@@ -338,18 +338,39 @@ export class StateStore {
     this.deletedMap = mergeDeletedMaps(this.deletedMap, imported.deletedMap);
     this.deletedGroupsMap = mergeDeletedMaps(this.deletedGroupsMap, imported.deletedGroupsMap);
 
-    if (Array.isArray(imported.links)) {
-      this.links = normalizeLinks(imported.links).filter((link) => {
-        const ts = this.deletedMap[link._id];
-        return !ts || (link.updatedAt && link.updatedAt > ts);
-      });
-    }
-
     const isGroupDeleted = (groupName) => Boolean(this.deletedGroupsMap[groupName]);
 
-    if (Array.isArray(imported.groups?.list)) {
-      // Drop groups tombstoned on any device so deletions/renames stick.
-      this.groups.list = imported.groups.list.filter((name) => !isGroupDeleted(name));
+    // Use additive merge for links/groups so a pull never clobbers local
+    // edits that have not yet been pushed (e.g. offline group creation on
+    // Quetta). mergeLocalAddsIntoRemote handles LWW for links and union
+    // for groups while respecting tombstones.
+    if (Array.isArray(imported.links) || Array.isArray(imported.groups?.list)) {
+      const merged = mergeLocalAddsIntoRemote(
+        {
+          links: Array.isArray(imported.links) ? imported.links : this.links,
+          groups: imported.groups || this.groups,
+          deletedMap: this.deletedMap,
+          deletedGroupsMap: this.deletedGroupsMap
+        },
+        {
+          links: this.links,
+          groups: this.groups,
+          deletedMap: this.deletedMap,
+          deletedGroupsMap: this.deletedGroupsMap
+        }
+      );
+
+      if (Array.isArray(imported.links)) {
+        this.links = normalizeLinks(merged.links).filter((link) => {
+          const ts = this.deletedMap[link._id];
+          return !ts || (link.updatedAt && link.updatedAt > ts);
+        });
+      }
+
+      if (Array.isArray(imported.groups?.list)) {
+        // merged.groups.list is already union-filtered; keep it
+        this.groups.list = merged.groups.list.filter((name) => !isGroupDeleted(name));
+      }
     }
 
     this.profiles = Object.assign({}, this.profiles, imported.profiles || {});
