@@ -186,23 +186,6 @@ import { StateStore } from './state.js';
         return;
       }
     });
-
-    document.addEventListener('contextmenu', (e) => {
-      const groupTarget = e.target.closest('.group-context-target');
-      const linkTarget = e.target.closest('.link-item');
-      if (!groupTarget && !linkTarget) return;
-
-      e.preventDefault();
-      if (!store.isEditMode) {
-        enterEditMode();
-      }
-
-      if (linkTarget) {
-        openLinkEditor(linkTarget.dataset.id);
-      } else if (groupTarget) {
-        openGroupEditor(groupTarget.dataset.groupName || store.selectedGroup);
-      }
-    });
   }
 
   addCurrentBtn.addEventListener('click', async () => {
