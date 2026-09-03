@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createFaviconController, FAVICON_CACHE_TTL } from '../src/newtab/favicon-controller.js';
-import {
-  FAVICON_SOURCES,
-  getDefaultFaviconUrl,
-  getFaviconCandidates
-} from '../src/shared/utils/link-utils.js';
+import { FAVICON_SOURCES, getDefaultFaviconUrl } from '../src/shared/utils/link-utils.js';
+
+const flush = async () => {
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
+};
 
 test('uses a fresh local favicon cache for 14 days without fetching', () => {
   const pageUrl = 'https://example.com/';
@@ -83,14 +83,11 @@ test('replaces the letter fallback immediately after a successful fetch', async 
   let appendedNode = null;
   let removedClass = '';
   const cache = {};
-  globalThis.browser = {
-    runtime: {
-      id: 'extension-id',
-      sendMessage: async (_message) => ({
-        dataUrl: 'data:image/png;base64,aWNvbg==',
-        ok: true,
-        sourceUrl: getDefaultFaviconUrl('https://example.com/')
-      })
+  globalThis.fetch = async () => ({ ok: true, status: 200, blob: async () => ({}) });
+  globalThis.FileReader = class {
+    readAsDataURL() {
+      this.result = 'data:image/png;base64,aWNvbg==';
+      this.onloadend?.();
     }
   };
   globalThis.document = { querySelectorAll: () => [] };
@@ -123,12 +120,13 @@ test('replaces the letter fallback immediately after a successful fetch', async 
     link: { title: 'Example', url: 'https://example.com/' }
   });
   idleTask();
-  await Promise.resolve();
+  await flush();
 
   assert.equal(img.src, 'data:image/png;base64,aWNvbg==');
   assert.equal(appendedNode, img);
   assert.equal(removedClass, 'fallback-ready');
-  delete globalThis.browser;
+  delete globalThis.fetch;
+  delete globalThis.FileReader;
   delete globalThis.document;
 });
 
@@ -144,19 +142,15 @@ test('refreshes an expired Google cache with Google candidates', async () => {
   };
   let idleTask;
   let persisted = false;
-  globalThis.browser = {
-    runtime: {
-      sendMessage: async (message) => {
-        assert.deepEqual(message, {
-          type: 'fetch-favicon',
-          urls: getFaviconCandidates(pageUrl)
-        });
-        return {
-          dataUrl: 'data:image/svg+xml;base64,bmV3',
-          ok: true,
-          sourceUrl: googleUrl
-        };
-      }
+  const fetchedUrls = [];
+  globalThis.fetch = async (url) => {
+    fetchedUrls.push(url);
+    return { ok: true, status: 200, blob: async () => ({}) };
+  };
+  globalThis.FileReader = class {
+    readAsDataURL() {
+      this.result = 'data:image/svg+xml;base64,bmV3';
+      this.onloadend?.();
     }
   };
   globalThis.document = { querySelectorAll: () => [] };
@@ -177,17 +171,20 @@ test('refreshes an expired Google cache with Google candidates', async () => {
     link: { title: 'Example', url: pageUrl }
   });
   idleTask();
-  await Promise.resolve();
+  await flush();
 
   assert.equal(cache['https://example.com'].dataUrl, 'data:image/svg+xml;base64,bmV3');
   assert.equal(cache['https://example.com'].sourceUrl, googleUrl);
   assert.equal(persisted, true);
-  delete globalThis.browser;
+  assert.ok(fetchedUrls.length > 0);
+  assert.equal(fetchedUrls[0], googleUrl);
+  delete globalThis.fetch;
+  delete globalThis.FileReader;
   delete globalThis.document;
 });
 
 test('handles Chrome source directly without fetching or caching', () => {
-  globalThis.browser = { runtime: { id: 'extension-id' } };
+  globalThis.chrome = { runtime: { id: 'extension-id' } };
   let idleTaskScheduled = false;
   const controller = createFaviconController({
     getFaviconCache: () => {
@@ -225,5 +222,118 @@ test('handles Chrome source directly without fetching or caching', () => {
   );
   assert.equal(appendedImg, img);
   assert.equal(idleTaskScheduled, false);
-  delete globalThis.browser;
+  delete globalThis.chrome;
+});
+
+test('falls back to direct favicon URL when fetchFaviconDataUrl fails (e.g. CORS in Firefox)', async () => {
+  let idleTask;
+  let appendedNode = null;
+  let removedClass = '';
+  const cache = {};
+  // Simulate fetch failure (e.g. CORS or network error)
+  globalThis.fetch = async () => ({ ok: false, status: 0 });
+  globalThis.document = { querySelectorAll: () => [] };
+
+  let persisted = false;
+  const controller = createFaviconController({
+    getFaviconCache: () => cache,
+    persistFaviconCache: () => {
+      persisted = true;
+    },
+    queueIdleTask: (task) => {
+      idleTask = task;
+    }
+  });
+
+  const pageUrl = 'https://example.com/';
+  const expectedDirectUrl = getDefaultFaviconUrl(pageUrl);
+  const element = {
+    classList: {
+      add: () => {},
+      remove: (cls) => {
+        removedClass = cls;
+      }
+    }
+  };
+  const iconWrap = {
+    appendChild: (node) => {
+      appendedNode = node;
+    },
+    textContent: 'E'
+  };
+  const img = {
+    dataset: {},
+    isConnected: false,
+    style: {}
+  };
+
+  controller.attach({
+    element,
+    iconWrap,
+    img,
+    link: { title: 'Example', url: pageUrl }
+  });
+
+  idleTask();
+  await flush();
+
+  assert.equal(img.src, expectedDirectUrl);
+  assert.equal(appendedNode, img);
+  assert.equal(removedClass, 'fallback-ready');
+  assert.equal(iconWrap.textContent, '');
+  assert.equal(cache['https://example.com'].dataUrl, expectedDirectUrl);
+  assert.equal(persisted, true);
+
+  delete globalThis.fetch;
+  delete globalThis.document;
+});
+
+test('detects Google 16x16 placeholder globe and switches to letter fallback', () => {
+  let addedClass = '';
+  const cache = {};
+  let persisted = false;
+
+  const controller = createFaviconController({
+    getFaviconCache: () => cache,
+    persistFaviconCache: () => {
+      persisted = true;
+    },
+    queueIdleTask: () => {}
+  });
+
+  const pageUrl = 'https://best.local/';
+  const element = {
+    classList: {
+      add: (cls) => {
+        addedClass = cls;
+      }
+    }
+  };
+  const iconWrap = {
+    appendChild: () => {},
+    textContent: ''
+  };
+  const img = {
+    dataset: {},
+    src: 'https://www.google.com/s2/favicons?domain_url=https%3A%2F%2Fbest.local&sz=256',
+    naturalWidth: 16,
+    naturalHeight: 16,
+    style: {}
+  };
+
+  controller.attach({
+    element,
+    iconWrap,
+    img,
+    link: { title: 'Best Local', url: pageUrl }
+  });
+
+  // Trigger onload with the 16x16 Google globe
+  img.onload();
+
+  assert.equal(iconWrap.textContent, 'B');
+  assert.equal(addedClass, 'fallback-ready');
+  assert.equal(cache['https://best.local'].fallback, true);
+  assert.equal(cache['https://best.local'].dataUrl, undefined);
+  assert.equal(persisted, true);
 });

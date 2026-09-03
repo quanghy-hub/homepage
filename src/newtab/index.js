@@ -1,10 +1,10 @@
-import { STORAGE_KEYS } from '../shared/constants/storage-keys.js';
 import { autoTitle, isHttpUrl } from '../shared/utils/link-utils.js';
 import { getDomRefs } from './dom.js';
 import { bindDragDrop } from './drag-drop.js';
 import { bindEditModeActivation } from './edit-mode.js';
 import { createHomeRenderer } from './home-renderer.js';
 import { createModalController } from './modal-controller.js';
+import { resolveRecentPage } from './recent-page.js';
 import { createSettingsController } from './settings-controller.js';
 import { createSyncController } from './sync-controller.js';
 import { normalizeSettings } from './storage.js';
@@ -18,9 +18,17 @@ import { StateStore } from './state.js';
 
   /* ========== DOM REFS ========== */
   const dom = getDomRefs();
-  const { addCurrentBtn, quickActionStatus, syncProfileSelect } = dom;
+  const { addCurrentBtn, editModeBtn, quickActionStatus, syncProfileSelect } = dom;
   const IS_TOUCH_DEVICE =
     window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+
+  editModeBtn?.addEventListener('click', () => {
+    if (store.isEditMode) {
+      exitEditMode();
+    } else {
+      enterEditMode();
+    }
+  });
 
   /* ========== BIND STATE CALLBACKS ========== */
   store.onRender = render;
@@ -109,6 +117,7 @@ import { StateStore } from './state.js';
     getLinksForGroup: (groupName) => store.getLinksForGroup(groupName),
     getSelectedGroup: () => store.selectedGroup,
     normalizeGroupOrders: (...groupNames) => store.normalizeGroupOrders(...groupNames),
+    recordDeletedGroups: (...groupNames) => store.recordDeletedGroups(...groupNames),
     renameGroupInProfiles: (oldName, newName) => store.renameGroupInProfiles(oldName, newName),
     render,
     saveData: (options) => store.saveData(options),
@@ -145,13 +154,6 @@ import { StateStore } from './state.js';
         return;
       }
 
-      const groupTarget = e.target.closest('.group-context-target');
-      if (groupTarget && store.isEditMode) {
-        e.preventDefault();
-        openGroupEditor(groupTarget.dataset.groupName || store.selectedGroup);
-        return;
-      }
-
       const tab = e.target.closest('#group-tabs .tab');
       if (tab) {
         if (tab.dataset.action === 'add-group') {
@@ -160,34 +162,51 @@ import { StateStore } from './state.js';
           modalController.openModal('add-group');
           return;
         }
-        store.selectedGroup = tab.dataset.groupName;
-        store.groups.selected = store.selectedGroup;
+
+        const groupName = tab.dataset.groupName;
+        if (!groupName) return;
+
+        if (store.isEditMode && groupName === store.selectedGroup) {
+          e.preventDefault();
+          openGroupEditor(groupName);
+          return;
+        }
+
+        e.preventDefault();
+        store.setSelectedGroup(groupName);
         store.saveData();
         render();
+        return;
+      }
+
+      const pinnedHeader = e.target.closest('.pinned-group-header');
+      if (pinnedHeader && store.isEditMode) {
+        e.preventDefault();
+        openGroupEditor(pinnedHeader.dataset.groupName);
         return;
       }
     });
 
     document.addEventListener('contextmenu', (e) => {
-      if (!store.isEditMode) return;
-      const draggableTarget = e.target.closest(
-        '.link-item, .pinned-group-header, #group-tabs .tab:not(.tab-add-group)'
-      );
-      if (draggableTarget && IS_TOUCH_DEVICE) {
-        e.preventDefault();
-        return;
+      const groupTarget = e.target.closest('.group-context-target');
+      const linkTarget = e.target.closest('.link-item');
+      if (!groupTarget && !linkTarget) return;
+
+      e.preventDefault();
+      if (!store.isEditMode) {
+        enterEditMode();
       }
 
-      const groupTarget = e.target.closest('.group-context-target');
-      if (!groupTarget) return;
-      e.preventDefault();
-      openGroupEditor(groupTarget.dataset.groupName || store.selectedGroup);
+      if (linkTarget) {
+        openLinkEditor(linkTarget.dataset.id);
+      } else if (groupTarget) {
+        openGroupEditor(groupTarget.dataset.groupName || store.selectedGroup);
+      }
     });
   }
 
   addCurrentBtn.addEventListener('click', async () => {
-    const result = await browser.storage.local.get([STORAGE_KEYS.recentPage]);
-    const recent = result[STORAGE_KEYS.recentPage];
+    const recent = await resolveRecentPage();
     if (!recent || !isHttpUrl(recent.url)) {
       setQuickActionStatus(
         'No recent page to add. Please open a website first, then return.',
@@ -213,7 +232,9 @@ import { StateStore } from './state.js';
       links: store.links,
       groups: store.groups,
       settings: store.settings,
-      profileId: store.profileId
+      profileId: store.profileId,
+      deletedMap: store.deletedMap,
+      deletedGroupsMap: store.deletedGroupsMap
     }),
     persistCurrentProfile: () => store.persistCurrentProfile(),
     refreshSettingsControls,
@@ -231,11 +252,33 @@ import { StateStore } from './state.js';
       modalController.closeModal();
       settingsController.close();
       exitEditMode();
+      return;
+    }
+
+    if (e.key === 'e' || e.key === 'E') {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.isContentEditable);
+      const isModalOpen =
+        !dom.modalOverlay.classList.contains('hidden') ||
+        !dom.settingsOverlay.classList.contains('hidden');
+
+      if (!isInput && !isModalOpen) {
+        e.preventDefault();
+        if (store.isEditMode) {
+          exitEditMode();
+        } else {
+          enterEditMode();
+        }
+      }
     }
   });
 
   /* ========== AUTO-REFRESH ON EXTERNAL CHANGES ========== */
-  browser.storage.onChanged.addListener((changes, area) => {
+  chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && store.suppressStorageSync) return;
     if (
       area === 'local' &&
@@ -297,6 +340,7 @@ import { StateStore } from './state.js';
     store.loadFaviconCache(),
     syncController.loadSavedRevision(),
     syncController.loadSavedReady(),
+    syncController.loadSavedPending(),
     syncController.loadSavedCredentials(),
     syncController.loadSavedStatuses()
   ]).then(([, , savedRevision]) => {

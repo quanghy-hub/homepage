@@ -1,17 +1,19 @@
 {
   "name": "home",
-  "version": "1.0.0",
+  "version": "1.0.13",
   "description": "A clean, highly customizable new tab page designed to organize your favorite web links. Easily group your quicklinks into custom categories, pin important groups for quick access, and keep your workspace clean and organized.",
-  "main": "index.js",
+  "private": true,
   "directories": {
     "test": "tests"
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "lint": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\"",
-    "lint:fix": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"tests/**/*.mjs\" --fix",
+    "lint": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\"",
+    "lint:fix": "eslint \"src/**/*.js\" \"worker/src/**/*.js\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" --fix",
     "format": "prettier --write .",
-    "build:firefox": "web-ext build --overwrite-dest",
+    "build:firefox": "npx web-ext build --filename \"{name}-{version}.xpi\" --overwrite-dest --ignore-files \"tests\" \"scripts\" \"worker\" \"*.md\" \"eslint.config.mjs\" \"package*.json\"",
+    "install:dev": "node scripts/install-dev.mjs",
+    "build:zip": "node scripts/build-zip.mjs",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -21,12 +23,23 @@
     ],
     "*.{css,html,json,md}": "prettier --write"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/quanghy-hub/homepage.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "firefox-extension",
+    "chrome-extension",
+    "new-tab",
+    "quicklinks",
+    "speed-dial",
+    "cloudflare-worker",
+    "cross-device-sync"
+  ],
+  "author": "quanghy-hub",
   "license": "ISC",
   "type": "module",
   "bugs": {

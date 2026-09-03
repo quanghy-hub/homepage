@@ -21,6 +21,26 @@ export function normalizeSettings(settings) {
   };
 }
 
+export const DELETED_MAP_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+
+export function normalizeDeletedMap(value, now = Date.now()) {
+  const out = {};
+  Object.entries(value && typeof value === 'object' ? value : {}).forEach(([id, ts]) => {
+    if (id && Number.isSafeInteger(ts) && ts > now - DELETED_MAP_TTL_MS) out[id] = ts;
+  });
+  return out;
+}
+
+export function mergeDeletedMaps(...maps) {
+  const out = {};
+  maps.forEach((map) => {
+    Object.entries(map && typeof map === 'object' ? map : {}).forEach(([id, ts]) => {
+      if (id && Number.isSafeInteger(ts)) out[id] = Math.max(out[id] || 0, ts);
+    });
+  });
+  return out;
+}
+
 export function normalizeLinks(links) {
   if (!Array.isArray(links)) return [];
   return links
@@ -82,56 +102,75 @@ export function getProfileFromState(state) {
   );
 }
 
-export async function loadAppData(state) {
-  const result = await browser.storage.local.get([
-    STORAGE_KEYS.links,
-    STORAGE_KEYS.groups,
-    STORAGE_KEYS.settings,
-    STORAGE_KEYS.profiles,
-    STORAGE_KEYS.syncProfile
-  ]);
-  state.profileId = result[STORAGE_KEYS.syncProfile] || DEFAULT_PROFILE_ID;
+export function loadAppData(state) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(
+      [
+        STORAGE_KEYS.links,
+        STORAGE_KEYS.groups,
+        STORAGE_KEYS.settings,
+        STORAGE_KEYS.profiles,
+        STORAGE_KEYS.syncProfile,
+        STORAGE_KEYS.deletedMap,
+        STORAGE_KEYS.deletedGroupsMap
+      ],
+      (result) => {
+        state.profileId = result[STORAGE_KEYS.syncProfile] || DEFAULT_PROFILE_ID;
+        state.deletedMap = normalizeDeletedMap(result[STORAGE_KEYS.deletedMap]);
+        state.deletedGroupsMap = normalizeDeletedMap(result[STORAGE_KEYS.deletedGroupsMap]);
 
-  if (result[STORAGE_KEYS.links] && result[STORAGE_KEYS.links].length > 0) {
-    state.links = normalizeLinks(result[STORAGE_KEYS.links]);
-    state.groups = result[STORAGE_KEYS.groups] || deepClone(DEFAULT_GROUPS);
-    if (typeof state.groups.pinned === 'string') {
-      state.groups.pinned = [state.groups.pinned];
-    }
-  } else {
-    state.links = normalizeLinks(deepClone(DEFAULT_LINKS));
-    state.groups = deepClone(DEFAULT_GROUPS);
-  }
+        if (result[STORAGE_KEYS.links] && result[STORAGE_KEYS.links].length > 0) {
+          state.links = normalizeLinks(result[STORAGE_KEYS.links]);
+          state.groups = result[STORAGE_KEYS.groups] || deepClone(DEFAULT_GROUPS);
+          if (typeof state.groups.pinned === 'string') {
+            state.groups.pinned = [state.groups.pinned];
+          }
+        } else {
+          state.links = normalizeLinks(deepClone(DEFAULT_LINKS));
+          state.groups = deepClone(DEFAULT_GROUPS);
+        }
 
-  state.settings = normalizeSettings(result[STORAGE_KEYS.settings]);
-  const savedProfiles = result[STORAGE_KEYS.profiles] || {};
-  state.profiles = Object.assign(deepClone(DEFAULT_PROFILES), savedProfiles);
+        state.settings = normalizeSettings(result[STORAGE_KEYS.settings]);
+        const savedProfiles = result[STORAGE_KEYS.profiles] || {};
+        state.profiles = Object.assign(deepClone(DEFAULT_PROFILES), savedProfiles);
 
-  const activeProfile = normalizeProfile(
-    savedProfiles[state.profileId] || state.profiles[state.profileId] || null,
-    state.groups,
-    state.settings
-  );
-  state.profiles[state.profileId] = activeProfile;
-  state.groups.pinned = activeProfile.pinned;
-  state.groups.selected = activeProfile.selected;
-  state.settings = activeProfile.settings;
-  state.selectedGroup = state.groups.selected;
+        const activeProfile = normalizeProfile(
+          savedProfiles[state.profileId] || state.profiles[state.profileId] || null,
+          state.groups,
+          state.settings
+        );
+        state.profiles[state.profileId] = activeProfile;
+        state.groups.pinned = activeProfile.pinned;
+        state.groups.selected = activeProfile.selected;
+        state.settings = activeProfile.settings;
+        state.selectedGroup = state.groups.selected;
+        resolve();
+      }
+    );
+  });
 }
 
 export function saveAppData(state) {
   const profiles = Object.assign({}, state.profiles || {});
   profiles[state.profileId || DEFAULT_PROFILE_ID] = getProfileFromState(state);
 
-  browser.storage.local.set({
-    [STORAGE_KEYS.links]: state.links,
-    [STORAGE_KEYS.groups]: {
-      list: state.groups.list
-    },
-    [STORAGE_KEYS.settings]: state.settings,
-    [STORAGE_KEYS.profiles]: profiles,
-    [STORAGE_KEYS.syncProfile]: state.profileId || DEFAULT_PROFILE_ID
+  return new Promise((resolve) => {
+    chrome.storage.local.set(
+      {
+        [STORAGE_KEYS.links]: state.links,
+        [STORAGE_KEYS.groups]: {
+          list: state.groups.list
+        },
+        [STORAGE_KEYS.settings]: state.settings,
+        [STORAGE_KEYS.profiles]: profiles,
+        [STORAGE_KEYS.syncProfile]: state.profileId || DEFAULT_PROFILE_ID,
+        [STORAGE_KEYS.deletedMap]: state.deletedMap || {},
+        [STORAGE_KEYS.deletedGroupsMap]: state.deletedGroupsMap || {}
+      },
+      () => {
+        state.profiles = profiles;
+        resolve();
+      }
+    );
   });
-
-  state.profiles = profiles;
 }

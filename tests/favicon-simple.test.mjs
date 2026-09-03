@@ -56,6 +56,20 @@ test('keeps Google favicon URLs in the shared synchronized links payload', () =>
   assert.equal(exported.profileId, 'mobile');
 });
 
+test('buildExportData includes deletedMap tombstones in the sync payload', () => {
+  const state = {
+    groups: { list: ['A'], pinned: ['A'], selected: 'A' },
+    links: [],
+    profileId: 'macbook',
+    deletedMap: { linksabc123: 1234567890 }
+  };
+
+  const exported = buildExportData(state, 7);
+
+  assert.equal(exported.baseRevision, 7);
+  assert.equal(exported.deletedMap.linksabc123, 1234567890);
+});
+
 test('rejects invalid page URLs', () => {
   assert.deepEqual(getFaviconCandidates('not a URL'), []);
   assert.deepEqual(getFaviconCandidates('javascript:alert(1)'), []);
@@ -82,7 +96,7 @@ test('drops invalid synchronized links during normalization', () => {
 });
 
 test('preserves a selected Chrome favicon source during normalization', () => {
-  globalThis.browser = { runtime: { id: 'extension-id' } };
+  globalThis.chrome = { runtime: { id: 'extension-id' } };
   const [link] = normalizeLinks([
     {
       _id: 'chrome',
@@ -93,7 +107,7 @@ test('preserves a selected Chrome favicon source during normalization', () => {
 
   assert.equal(link.faviconSource, FAVICON_SOURCES.chrome);
   assert.match(link.faviconUrl, /^chrome-extension:\/\/extension-id\/_favicon\//);
-  delete globalThis.browser;
+  delete globalThis.chrome;
 });
 
 test('migrates a removed favicon source back to Google', () => {
@@ -118,7 +132,7 @@ test('keeps only supported settings fields', () => {
 });
 
 test('loadFaviconPreview resolves Chrome source directly without messaging', async () => {
-  globalThis.browser = { runtime: { id: 'extension-id' } };
+  globalThis.chrome = { runtime: { id: 'extension-id' } };
 
   const pageUrl = 'https://example.com/';
   const result = await loadFaviconPreview(
@@ -137,5 +151,5 @@ test('loadFaviconPreview resolves Chrome source directly without messaging', asy
     result,
     'chrome-extension://extension-id/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F&size=1024'
   );
-  delete globalThis.browser;
+  delete globalThis.chrome;
 });

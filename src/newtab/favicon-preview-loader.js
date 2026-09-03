@@ -4,18 +4,13 @@ import {
   getFaviconUrl,
   normalizeFaviconSource
 } from '../shared/utils/link-utils.js';
+import { fetchFaviconDataUrl } from './favicon-fetch.js';
 
-async function requestFaviconDataUrl(urls) {
-  if (!urls.length) return '';
-  try {
-    const response = await browser.runtime.sendMessage({ type: 'fetch-favicon', urls });
-    if (!response?.ok || !response.dataUrl?.startsWith('data:image/')) {
-      return '';
-    }
-    return response.dataUrl;
-  } catch {
-    return '';
-  }
+function requestFaviconDataUrl(urls) {
+  if (!urls.length) return Promise.resolve('');
+  return fetchFaviconDataUrl(urls)
+    .then(({ dataUrl }) => dataUrl)
+    .catch(() => urls[0] || '');
 }
 
 export function loadFaviconPreview(

@@ -32,13 +32,19 @@ export function getFaviconUrl(url, source = FAVICON_SOURCES.google) {
   if (selectedSource === FAVICON_SOURCES.google) return getDefaultFaviconUrl(url);
   const parsed = new URL(url);
 
-  if (typeof browser === 'undefined' || !browser.runtime?.id) return '';
+  const extensionApi =
+    typeof chrome !== 'undefined' && chrome.runtime?.id
+      ? chrome
+      : typeof browser !== 'undefined' && browser.runtime?.id
+        ? browser
+        : null;
+  if (!extensionApi) return '';
   const isFirefox =
     typeof navigator !== 'undefined' &&
     navigator.userAgent &&
     navigator.userAgent.includes('Firefox');
   if (isFirefox) return getDefaultFaviconUrl(url);
-  return `chrome-extension://${browser.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(parsed.href)}&size=1024`;
+  return `chrome-extension://${extensionApi.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(parsed.href)}&size=1024`;
 }
 
 export function getFaviconCandidates(url) {
@@ -55,6 +61,8 @@ export function getFaviconCandidates(url) {
     candidates.push(
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsed.hostname)}&sz=256`
     );
+    candidates.push(`https://icons.duckduckgo.com/ip3/${encodeURIComponent(parsed.hostname)}.ico`);
+    candidates.push(`${parsed.origin}/favicon.ico`);
 
     return candidates;
   } catch {

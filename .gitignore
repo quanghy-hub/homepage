@@ -2,3 +2,7 @@
 node_modules/
 worker/.wrangler/
 web-ext-artifacts/
+dist/
+*.zip
+src/shared/constants/worker-config.local.js
+

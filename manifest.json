@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Homepage",
-  "version": "1.0.0",
+  "version": "1.0.13",
   "description": "Custom new tab page with grouped quicklinks",
   "browser_specific_settings": {
     "gecko": {
@@ -10,6 +10,9 @@
     }
   },
   "incognito": "spanning",
+  "chrome_settings_overrides": {
+    "homepage": "src/newtab/index.html"
+  },
   "chrome_url_overrides": {
     "newtab": "src/newtab/index.html"
   },
@@ -17,18 +20,17 @@
   "host_permissions": [
     "https://www.google.com/*",
     "https://*.gstatic.com/*",
+    "https://icons.duckduckgo.com/*",
     "https://*.workers.dev/*"
   ],
-  "background": {
-    "scripts": ["src/background/index.js"],
-    "type": "module"
-  },
   "icons": {
     "16": "assets/icons/icon16.png",
     "48": "assets/icons/icon48.png",
     "128": "assets/icons/icon128.png"
   },
   "action": {
+    "default_title": "Homepage",
+    "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "assets/icons/icon16.png",
       "48": "assets/icons/icon48.png",

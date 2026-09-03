@@ -7,6 +7,12 @@ import {
   normalizeProfile,
   saveAppData
 } from './storage.js';
+import { mergeDeletedMaps, mergeLocalAddsIntoRemote } from './sync-api.js';
+import { saveSyncPending } from './cloudflare-sync.js';
+
+const FAVICON_CACHE_MAX_CHARS = 2_500_000; // keep storage.local writes well under quota
+// The UI relies on at least one pinned + one unpinned group to stay navigable.
+const MIN_GROUP_COUNT = 2;
 
 export class StateStore {
   constructor() {
@@ -17,6 +23,8 @@ export class StateStore {
     this.profileId = DEFAULT_PROFILE_ID;
     this.selectedGroup = '';
     this.faviconCache = {};
+    this.deletedMap = {};
+    this.deletedGroupsMap = {};
     this.suppressStorageSync = false;
     this.isEditMode = false;
     this.syncRevision = null;
@@ -43,12 +51,34 @@ export class StateStore {
       this.profiles = state.profiles;
       this.profileId = state.profileId;
       this.selectedGroup = state.selectedGroup;
+      this.deletedMap = state.deletedMap || {};
+      this.deletedGroupsMap = state.deletedGroupsMap || {};
     });
   }
 
-  async loadFaviconCache() {
-    const result = await browser.storage.local.get([STORAGE_KEYS.faviconCache]);
-    this.faviconCache = result[STORAGE_KEYS.faviconCache] || {};
+  loadFaviconCache() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get([STORAGE_KEYS.faviconCache], (result) => {
+        const cache = result[STORAGE_KEYS.faviconCache] || {};
+        let modified = false;
+        for (const [key, entry] of Object.entries(cache)) {
+          if (!entry) continue;
+          if (
+            typeof entry.dataUrl === 'string' &&
+            (entry.dataUrl.includes('google.com/s2/favicons') ||
+              entry.dataUrl.includes('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9h'))
+          ) {
+            delete cache[key];
+            modified = true;
+          }
+        }
+        this.faviconCache = cache;
+        if (modified) {
+          this.persistFaviconCache();
+        }
+        resolve();
+      });
+    });
   }
 
   saveData(options = {}) {
@@ -58,20 +88,42 @@ export class StateStore {
       groups: this.groups,
       settings: this.settings,
       profiles: this.profiles,
-      profileId: this.profileId
-    });
-    setTimeout(() => {
+      profileId: this.profileId,
+      deletedMap: this.deletedMap,
+      deletedGroupsMap: this.deletedGroupsMap
+    }).finally(() => {
       this.suppressStorageSync = false;
-    }, 0);
+    });
     if (!options.skipAutoSync) {
+      // Remember that the cloud may be stale until a push confirms otherwise,
+      // so a reload/kill before the debounce fires cannot silently lose edits.
+      saveSyncPending(true);
       this.onScheduleSync();
     }
   }
 
   persistFaviconCache() {
-    browser.storage.local.set({
-      [STORAGE_KEYS.faviconCache]: this.faviconCache
+    chrome.storage.local.set({ [STORAGE_KEYS.faviconCache]: this.faviconCache }, () => {
+      if (!chrome.runtime?.lastError) return;
+      // Quota exceeded (or another write error): evict the oldest entries and retry once.
+      this.pruneFaviconCache(FAVICON_CACHE_MAX_CHARS / 2);
+      chrome.storage.local.set({ [STORAGE_KEYS.faviconCache]: this.faviconCache }, () => {});
     });
+  }
+
+  pruneFaviconCache(maxChars = FAVICON_CACHE_MAX_CHARS) {
+    const cache = this.faviconCache || {};
+    const size = () => JSON.stringify(cache).length;
+    if (size() <= maxChars) return;
+
+    const entries = Object.entries(cache)
+      .filter(([, entry]) => entry && Number.isFinite(entry.updatedAt))
+      .sort((a, b) => a[1].updatedAt - b[1].updatedAt);
+
+    for (const [key] of entries) {
+      delete cache[key];
+      if (size() <= maxChars) break;
+    }
   }
 
   persistCurrentProfile() {
@@ -162,6 +214,19 @@ export class StateStore {
     });
   }
 
+  /**
+   * Records group-name tombstones so two-way sync drops the names instead of
+   * resurrecting them (deletion and rename both funnel through here).
+   */
+  recordDeletedGroups(...groupNames) {
+    const now = Date.now();
+    groupNames.filter(Boolean).forEach((groupName) => {
+      if (!this.deletedGroupsMap[groupName]) {
+        this.deletedGroupsMap[groupName] = now;
+      }
+    });
+  }
+
   setEditMode(nextValue) {
     this.isEditMode = !!nextValue;
     document.body.classList.toggle('edit-mode', this.isEditMode);
@@ -173,6 +238,10 @@ export class StateStore {
     if (!dragged || !target) return;
     const sourceGroup = dragged.parent;
 
+    if (targetGroup && dragged.parent !== targetGroup) {
+      // Moving across groups must bump updatedAt so LWW sync keeps the move.
+      dragged.updatedAt = Date.now();
+    }
     dragged.parent = targetGroup || target.parent;
 
     const groupLinks = this.getLinksForGroup(dragged.parent);
@@ -237,11 +306,22 @@ export class StateStore {
   }
 
   deleteGroup(groupName) {
-    if (!groupName || this.groups.list.length <= 2) return;
+    if (!groupName || this.groups.list.length <= MIN_GROUP_COUNT) return;
 
+    const deletedAt = Date.now();
+    this.recordDeletedGroups(groupName);
     this.groups.list = this.groups.list.filter((x) => x !== groupName);
     this.groups.pinned = this.groups.pinned.filter((x) => x !== groupName);
-    this.links = this.links.filter((l) => l.parent !== groupName);
+
+    const remaining = [];
+    this.links.forEach((link) => {
+      if (link.parent === groupName) {
+        this.deletedMap[link._id] = deletedAt;
+      } else {
+        remaining.push(link);
+      }
+    });
+    this.links = remaining;
 
     if (this.selectedGroup === groupName) {
       this.selectedGroup = this.getFallbackSelected();
@@ -258,6 +338,7 @@ export class StateStore {
     const target = this.links.find((l) => l._id === linkId);
     if (!target) return;
 
+    this.deletedMap[linkId] = Date.now();
     this.links = this.links.filter((l) => l._id !== linkId);
     const sameGroup = this.getLinksForGroup(target.parent);
     sameGroup.forEach((item, idx) => {
@@ -270,12 +351,42 @@ export class StateStore {
   applyImportedState(imported) {
     if (!imported || typeof imported !== 'object') return;
 
-    if (Array.isArray(imported.links)) {
-      this.links = normalizeLinks(imported.links);
-    }
+    this.deletedMap = mergeDeletedMaps(this.deletedMap, imported.deletedMap);
+    this.deletedGroupsMap = mergeDeletedMaps(this.deletedGroupsMap, imported.deletedGroupsMap);
 
-    if (Array.isArray(imported.groups?.list)) {
-      this.groups.list = imported.groups.list;
+    const isGroupDeleted = (groupName) => Boolean(this.deletedGroupsMap[groupName]);
+
+    // Use additive merge for links/groups so a pull never clobbers local
+    // edits that have not yet been pushed (e.g. offline group creation on
+    // Quetta). mergeLocalAddsIntoRemote handles LWW for links and union
+    // for groups while respecting tombstones.
+    if (Array.isArray(imported.links) || Array.isArray(imported.groups?.list)) {
+      const merged = mergeLocalAddsIntoRemote(
+        {
+          links: Array.isArray(imported.links) ? imported.links : this.links,
+          groups: imported.groups || this.groups,
+          deletedMap: this.deletedMap,
+          deletedGroupsMap: this.deletedGroupsMap
+        },
+        {
+          links: this.links,
+          groups: this.groups,
+          deletedMap: this.deletedMap,
+          deletedGroupsMap: this.deletedGroupsMap
+        }
+      );
+
+      if (Array.isArray(imported.links)) {
+        this.links = normalizeLinks(merged.links).filter((link) => {
+          const ts = this.deletedMap[link._id];
+          return !ts || (link.updatedAt && link.updatedAt > ts);
+        });
+      }
+
+      if (Array.isArray(imported.groups?.list)) {
+        // merged.groups.list is already union-filtered; keep it
+        this.groups.list = merged.groups.list.filter((name) => !isGroupDeleted(name));
+      }
     }
 
     this.profiles = Object.assign({}, this.profiles, imported.profiles || {});

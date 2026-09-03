@@ -9,6 +9,8 @@ export function createSettingsController({
 }) {
   const {
     cleanupFaviconsBtn,
+    grantFaviconPermsBtn,
+    faviconPermHint,
     settingIconSize,
     settingIconSizeVal,
     settingsBtn,
@@ -16,10 +18,32 @@ export function createSettingsController({
     settingsOverlay
   } = dom;
 
+  function checkFaviconPermissions() {
+    const ext =
+      typeof chrome !== 'undefined' ? chrome : typeof browser !== 'undefined' ? browser : null;
+    const origins = [
+      'https://www.google.com/*',
+      'https://*.gstatic.com/*',
+      'https://icons.duckduckgo.com/*'
+    ];
+    if (ext?.permissions?.contains && grantFaviconPermsBtn) {
+      ext.permissions.contains({ origins }, (hasPerms) => {
+        if (hasPerms) {
+          grantFaviconPermsBtn.classList.add('hidden');
+          faviconPermHint?.classList.add('hidden');
+        } else {
+          grantFaviconPermsBtn.classList.remove('hidden');
+          faviconPermHint?.classList.remove('hidden');
+        }
+      });
+    }
+  }
+
   function refreshControls() {
     const settings = getSettings();
     settingIconSize.value = settings.iconSize;
     settingIconSizeVal.textContent = settings.iconSize + 'px';
+    checkFaviconPermissions();
   }
 
   function open() {
@@ -31,6 +55,25 @@ export function createSettingsController({
   function close() {
     settingsOverlay.classList.add('hidden');
   }
+
+  grantFaviconPermsBtn?.addEventListener('click', () => {
+    const ext =
+      typeof chrome !== 'undefined' ? chrome : typeof browser !== 'undefined' ? browser : null;
+    if (!ext?.permissions?.request) return;
+    const origins = [
+      'https://www.google.com/*',
+      'https://*.gstatic.com/*',
+      'https://icons.duckduckgo.com/*'
+    ];
+    ext.permissions.request({ origins }, (granted) => {
+      if (granted) {
+        grantFaviconPermsBtn.classList.add('hidden');
+        faviconPermHint?.classList.add('hidden');
+        clearFaviconCache();
+        render();
+      }
+    });
+  });
 
   settingsBtn.addEventListener('click', open);
   settingsClose.addEventListener('click', close);

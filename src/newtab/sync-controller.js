@@ -1,10 +1,12 @@
 import {
   bindSyncCredentialInputs,
   getSyncSettings,
+  loadSyncPending,
   loadSyncReady,
   loadSavedSyncCredentials,
   loadSavedSyncRevision,
   loadSavedSyncStatuses,
+  saveSyncPending,
   saveSyncReady,
   saveSyncRevision,
   setSyncStatus as updateSyncStatus,
@@ -38,6 +40,20 @@ export function createSyncController({
   let isBootstrapping = false;
   let syncReady = false;
 
+  // Mirror of the persisted syncPending flag: set by saveData on every edit,
+  // cleared only after a confirmed push. Covers edits whose debounced push
+  // never ran (tab closed, mobile browser killed the frozen page...).
+  let hasPendingLocalChanges = false;
+
+  // Bumped whenever a sync is scheduled (i.e. new local edits exist). Lets a
+  // finishing push tell whether its snapshot already included every edit.
+  let pendingEpoch = 0;
+
+  // Auto-restore pulls happen immediately when a tab becomes visible and on a
+  // light interval while it stays visible; nothing runs while hidden or closed.
+  let lastAutoRestoreAt = 0;
+  let autoRestoreErrorVisible = false;
+
   function setSyncStatus(msg, type = '') {
     updateSyncStatus(dom, msg, type);
   }
@@ -69,12 +85,19 @@ export function createSyncController({
     }
   }
 
+  function describeSyncResult(updated) {
+    if (updated?.syncMerged) return 'B synced with newer cloud data';
+    if (updated?.syncConflict) return 'B had newer update; restored';
+    return 'B synced';
+  }
+
   async function pushToCloudflare(showStatus = true) {
     persistCurrentProfile();
     if (showStatus) setSyncStatus('Pushing to B...');
 
     isPushing = true;
     let updated;
+    const pushedEpoch = pendingEpoch;
     try {
       const config = getSyncSettings(dom);
       updated = await pushCloudflareState(
@@ -86,6 +109,11 @@ export function createSyncController({
       applyRemoteState(updated);
       syncReady = true;
       saveSyncReady(true);
+      if (pendingEpoch === pushedEpoch) {
+        // No edits landed while pushing — the cloud now has everything.
+        hasPendingLocalChanges = false;
+        saveSyncPending(false);
+      }
       saveData({ skipAutoSync: true });
       refreshSettingsControls();
     } finally {
@@ -93,12 +121,10 @@ export function createSyncController({
     }
 
     if (showStatus) {
-      const label = updated?.syncMerged
-        ? 'B synced with newer cloud data'
-        : updated?.syncConflict
-          ? 'B had newer update; restored'
-          : 'B synced';
-      setSyncStatus(`✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`, 'ok');
+      setSyncStatus(
+        `✓ ${describeSyncResult(updated)} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`,
+        'ok'
+      );
     }
     return updated;
   }
@@ -109,6 +135,24 @@ export function createSyncController({
     const backup = await pushCloudflareBackup(config.workerUrl, config.apiCode, 'a');
     setSyncStatus(`✓ A synced · ${revisionText(backup?.revision)} · ${formatSyncStamp()}`, 'ok');
     return backup;
+  }
+
+  function hasUnpushedChanges() {
+    return Boolean(autoSyncTimer) || hasPendingLocalChanges;
+  }
+
+  // Pushes local edits immediately instead of waiting out the debounce. Used
+  // when the tab hides/unloads and before any pull applies remote state, so
+  // un-pushed edits are never lost or overwritten by an older cloud copy.
+  async function flushPendingPush() {
+    if (!hasUnpushedChanges()) return false;
+    const config = getSyncSettings(dom);
+    if (!config.workerUrl || !config.apiCode) return false;
+
+    clearTimeout(autoSyncTimer);
+    autoSyncTimer = null;
+    await pushToCloudflare(false);
+    return true;
   }
 
   async function restoreFromBackup(slot) {
@@ -137,6 +181,7 @@ export function createSyncController({
   }
 
   function scheduleAutoSync() {
+    pendingEpoch += 1; // New (or not-yet-confirmed) local edits exist.
     clearTimeout(autoSyncTimer);
     const config = getSyncSettings(dom);
     if (!config.workerUrl || !config.apiCode) {
@@ -156,15 +201,15 @@ export function createSyncController({
 
     autoSyncTimer = setTimeout(async () => {
       autoSyncTimer = null;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        // Defer network traffic while the tab is hidden; reschedule instead.
+        scheduleAutoSync();
+        return;
+      }
       try {
         const updated = await pushToCloudflare(false);
-        const label = updated?.syncMerged
-          ? 'B synced with newer cloud data'
-          : updated?.syncConflict
-            ? 'B had newer update; restored'
-            : 'B synced';
         setSyncStatus(
-          `✓ ${label} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`,
+          `✓ ${describeSyncResult(updated)} · ${revisionText(updated?.revision)} · ${formatSyncStamp()}`,
           'ok'
         );
       } catch (err) {
@@ -177,14 +222,20 @@ export function createSyncController({
   }
 
   async function restoreLatestFromB(_showStatus = false) {
-    if (autoSyncTimer || isPushing || isRestoring) return false;
+    if (isPushing || isRestoring) return false;
 
     isRestoring = true;
     try {
+      // Never let a remote snapshot overwrite edits that have not been pushed
+      // yet — merge them into the cloud first.
+      await flushPendingPush();
+
       const config = getSyncSettings(dom);
       const remote = await pullCloudflareState(config.workerUrl, config.apiCode);
 
-      if (dom.syncStatus && dom.syncStatus.textContent.startsWith('✗ Auto restore error')) {
+      // A previous auto-restore error is now stale — clear it.
+      if (autoRestoreErrorVisible) {
+        autoRestoreErrorVisible = false;
         setSyncStatus('');
       }
 
@@ -219,6 +270,10 @@ export function createSyncController({
 
     isBootstrapping = true;
     try {
+      // Flush un-pushed local edits first so the revision comparison below
+      // cannot clobber them with an older remote snapshot.
+      await flushPendingPush();
+
       const remote = await pullCloudflareState(config.workerUrl, config.apiCode);
       const remoteRevision = Number.isSafeInteger(remote?.revision) ? remote.revision : 0;
       const localRevision = Number.isSafeInteger(getRevision()) ? getRevision() : 0;
@@ -232,10 +287,10 @@ export function createSyncController({
           `✓ B restored · ${revisionText(remoteRevision)} · ${formatSyncStamp()}`,
           'ok'
         );
-      } else {
-        setRevision(remoteRevision);
-        saveSyncRevision(remoteRevision);
       }
+      // When the cloud is at or behind the local revision, keep the local one:
+      // adopting a smaller remote revision (e.g. after a worker/bucket reset)
+      // would let stale cloud data overwrite newer local state later.
 
       syncReady = true;
       saveSyncReady(true);
@@ -252,26 +307,65 @@ export function createSyncController({
     }
   }
 
-  function startAutoRestore() {
-    clearInterval(autoRestoreTimer);
+  function autoRestoreFailure(err) {
+    if (err.message === 'Failed to fetch' || err.message.toLowerCase().includes('network')) {
+      return; // Transient network issues stay silent.
+    }
+    autoRestoreErrorVisible = true;
+    setSyncStatus('✗ Auto restore error: ' + err.message, 'err');
+  }
+
+  function maybeAutoRestore() {
     const config = getSyncSettings(dom);
-    if (!config.workerUrl || !config.apiCode) {
+    if (!config.workerUrl || !config.apiCode) return;
+    if (document.visibilityState === 'hidden') return;
+
+    // delaySeconds doubles as the minimum spacing between background pulls.
+    const minIntervalMs = Math.max(1, config.delaySeconds || 5) * 1000;
+    if (Date.now() - lastAutoRestoreAt < minIntervalMs) return;
+    lastAutoRestoreAt = Date.now();
+
+    restoreLatestFromB(false).catch(autoRestoreFailure);
+  }
+
+  function onVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      maybeAutoRestore();
       return;
     }
+    // Hidden: stop waiting for the debounce and flush pending edits now,
+    // while the page can still finish the request. If it cannot (mobile may
+    // freeze the page), the persisted pending flag retries on next open.
+    flushPendingPush().catch(() => {});
+  }
 
-    const intervalMs = Math.max(1, config.delaySeconds || 5) * 1000;
-    autoRestoreTimer = setInterval(() => {
-      if (document.visibilityState === 'hidden') return;
-      restoreLatestFromB(false).catch((err) => {
-        if (err.message === 'Failed to fetch') {
-          return;
-        }
-        setSyncStatus('✗ Auto restore error: ' + err.message, 'err');
-      });
-    }, intervalMs);
+  function startAutoRestore() {
+    const config = getSyncSettings(dom);
+    if (!config.workerUrl || !config.apiCode) return;
+
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // A tab that stays visible never fires visibilitychange again, so keep a
+    // light interval as a safety net for long-lived tabs. maybeAutoRestore
+    // still spaces out actual pulls; hidden tabs do nothing here.
+    clearInterval(autoRestoreTimer);
+    autoRestoreTimer = setInterval(
+      () => {
+        if (document.visibilityState === 'visible') maybeAutoRestore();
+      },
+      Math.max(1, config.delaySeconds || 5) * 1000
+    );
   }
 
   function bind() {
+    // Closing/reloading the page kills the debounced push — flush first.
+    // Best effort: if the request cannot finish, the persisted pending flag
+    // makes the next open push before pulling.
+    window.addEventListener('pagehide', () => {
+      flushPendingPush().catch(() => {});
+    });
+
     bindSyncCredentialInputs(dom, {
       onProfileChange: switchProfile,
       onConfigChange: () => {
@@ -351,6 +445,10 @@ export function createSyncController({
     loadSavedReady: async () => {
       syncReady = await loadSyncReady();
       return syncReady;
+    },
+    loadSavedPending: async () => {
+      hasPendingLocalChanges = await loadSyncPending();
+      return hasPendingLocalChanges;
     },
     loadSavedRevision: loadSavedSyncRevision,
     loadSavedStatuses: () => loadSavedSyncStatuses(dom),
